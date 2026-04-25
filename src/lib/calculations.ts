@@ -40,21 +40,28 @@ export function calcStock(stock: Stock): StockWithCalc {
 
 export function calcSummary(
   stocks: StockWithCalc[],
-  net_cash: number
+  cash: number,
+  invested_capital: number
 ): SummaryStats {
   const total_market_value = stocks.reduce((s, x) => s + x.market_value, 0);
   const total_day_change = stocks.reduce((s, x) => s + x.day_change_value, 0);
   const total_profit_loss = stocks.reduce((s, x) => s + x.profit_loss, 0);
-  const net_assets = total_market_value + net_cash;
-  // 汇总所有股票去年分红总额
   const total_dividend = stocks.reduce((s, x) => s + x.dividend_total, 0);
+
+  const total_assets = total_market_value + cash;
+  const total_return = total_assets - invested_capital;
+  const total_return_pct =
+    invested_capital > 0 ? total_return / invested_capital : 0;
 
   return {
     total_market_value,
     total_day_change,
     total_profit_loss,
-    net_assets,
-    net_cash,
     total_dividend,
+    cash,
+    invested_capital,
+    total_assets,
+    total_return,
+    total_return_pct,
   };
 }

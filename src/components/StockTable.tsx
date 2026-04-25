@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Edit2, Trash2, ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
+import { Edit2, Trash2, ChevronUp, ChevronDown, ChevronsUpDown, TrendingUp } from "lucide-react";
 import {
   StockWithCalc,
   MarketType,
@@ -13,6 +13,7 @@ import {
   formatDateTime,
   changeColor,
 } from "../lib/format";
+import StockTradeDialog, { TradePayload } from "./StockTradeDialog";
 
 const MARKETS: Array<MarketType | "全部"> = ["全部", "A股", "港股", "美股", "其他"];
 
@@ -20,6 +21,8 @@ interface Props {
   stocks: StockWithCalc[];
   onEdit: (stock: StockWithCalc) => void;
   onDelete: (stock: StockWithCalc) => void;
+  onTradeConfirm: (stock: StockWithCalc, payload: TradePayload) => Promise<void>;
+  tradeLoading?: boolean;
 }
 
 function SortIcon({ field, sort }: { field: SortField; sort: SortState }) {
@@ -32,13 +35,14 @@ function SortIcon({ field, sort }: { field: SortField; sort: SortState }) {
   );
 }
 
-export default function StockTable({ stocks, onEdit, onDelete }: Props) {
+export default function StockTable({ stocks, onEdit, onDelete, onTradeConfirm, tradeLoading }: Props) {
   const [search, setSearch] = useState("");
   const [marketFilter, setMarketFilter] = useState<MarketType | "全部">("全部");
   const [sort, setSort] = useState<SortState>({
     field: "updated_at",
     direction: "desc",
   });
+  const [tradeTarget, setTradeTarget] = useState<StockWithCalc | null>(null);
 
   function toggleSort(field: SortField) {
     setSort((prev) =>
@@ -109,85 +113,103 @@ export default function StockTable({ stocks, onEdit, onDelete }: Props) {
     );
   }
 
+  async function handleTradeConfirm(payload: TradePayload) {
+    if (!tradeTarget) return;
+    await onTradeConfirm(tradeTarget, payload);
+    setTradeTarget(null);
+  }
+
   return (
-    <div className="table-panel">
-      <div className="table-toolbar">
-        <input
-          className="search-input"
-          placeholder="搜索股票名称 / 代码..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-        <select
-          className="filter-select"
-          value={marketFilter}
-          onChange={(e) => setMarketFilter(e.target.value as MarketType | "全部")}
-        >
-          {MARKETS.map((m) => (
-            <option key={m} value={m}>
-              {m === "全部" ? "全部市场" : m}
-            </option>
-          ))}
-        </select>
-        <span style={{ marginLeft: "auto", color: "var(--color-text-muted)", fontSize: 12 }}>
-          共 {filtered.length} 条
-        </span>
+    <>
+      <div className="table-panel">
+        <div className="table-toolbar">
+          <input
+            className="search-input"
+            placeholder="搜索股票名称 / 代码..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          <select
+            className="filter-select"
+            value={marketFilter}
+            onChange={(e) => setMarketFilter(e.target.value as MarketType | "全部")}
+          >
+            {MARKETS.map((m) => (
+              <option key={m} value={m}>
+                {m === "全部" ? "全部市场" : m}
+              </option>
+            ))}
+          </select>
+          <span style={{ marginLeft: "auto", color: "var(--color-text-muted)", fontSize: 12 }}>
+            共 {filtered.length} 条
+          </span>
+        </div>
+
+        <div className="table-wrapper">
+          <table className="stock-table">
+            <thead>
+              <tr>
+                <Th label="股票名称" field="name" />
+                <Th label="市场" field="market" />
+                <th>代码</th>
+                <th>货币</th>
+                <th className="text-right">当前股价</th>
+                <th className="text-right">持仓数量</th>
+                <th className="text-right">成本价</th>
+                <Th label="持仓市值" field="market_value" className="text-right" />
+                <Th label="当日涨跌" field="day_change_value" className="text-right" />
+                <Th label="涨跌幅" field="day_change_pct" className="text-right" />
+                <Th label="浮动盈亏" field="profit_loss" className="text-right" />
+                <th className="text-right">盈亏率</th>
+                <th className="text-right">PE</th>
+                <th className="text-right">每十股分红</th>
+                <Th label="分红总额" field="dividend_total" className="text-right" />
+                <Th label="静态股息率" field="dividend_yield_pct" className="text-right" />
+                <th className="text-center">交易</th>
+                <th>备注</th>
+                <th>更新时间</th>
+                <th className="text-center">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={20}>
+                    <div className="empty-state">
+                      <div className="empty-state-icon">📋</div>
+                      <div className="empty-state-text">
+                        {stocks.length === 0
+                          ? "暂无股票, 点击右上角「新增股票」添加"
+                          : "没有找到匹配的股票"}
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                filtered.map((s) => (
+                  <StockRow
+                    key={s.id}
+                    stock={s}
+                    onEdit={onEdit}
+                    onDelete={onDelete}
+                    onOpenTrade={() => setTradeTarget(s)}
+                  />
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
-      <div className="table-wrapper">
-        <table className="stock-table">
-          <thead>
-            <tr>
-              <Th label="股票名称" field="name" />
-              <Th label="市场" field="market" />
-              <th>代码</th>
-              <th>货币</th>
-              <th className="text-right">当前股价</th>
-              <th className="text-right">昨日收盘</th>
-              <th className="text-right">持仓数量</th>
-              <th className="text-right">成本价</th>
-              <Th label="持仓市值" field="market_value" className="text-right" />
-              <Th label="当日涨跌" field="day_change_value" className="text-right" />
-              <Th label="涨跌幅" field="day_change_pct" className="text-right" />
-              <Th label="浮动盈亏" field="profit_loss" className="text-right" />
-              <th className="text-right">盈亏率</th>
-              <th className="text-right">PE</th>
-              <th className="text-right">每十股分红</th>
-              <Th label="分红总额" field="dividend_total" className="text-right" />
-              <Th label="静态股息率" field="dividend_yield_pct" className="text-right" />
-              <th>备注</th>
-              <th>更新时间</th>
-              <th className="text-center">操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.length === 0 ? (
-              <tr>
-                <td colSpan={20}>
-                  <div className="empty-state">
-                    <div className="empty-state-icon">📋</div>
-                    <div className="empty-state-text">
-                      {stocks.length === 0
-                        ? "暂无股票, 点击右上角「新增股票」添加"
-                        : "没有找到匹配的股票"}
-                    </div>
-                  </div>
-                </td>
-              </tr>
-            ) : (
-              filtered.map((s) => (
-                <StockRow
-                  key={s.id}
-                  stock={s}
-                  onEdit={onEdit}
-                  onDelete={onDelete}
-                />
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
-    </div>
+      {tradeTarget && (
+        <StockTradeDialog
+          stock={tradeTarget}
+          onConfirm={handleTradeConfirm}
+          onClose={() => setTradeTarget(null)}
+          saving={!!tradeLoading}
+        />
+      )}
+    </>
   );
 }
 
@@ -195,10 +217,12 @@ function StockRow({
   stock: s,
   onEdit,
   onDelete,
+  onOpenTrade,
 }: {
   stock: StockWithCalc;
   onEdit: (s: StockWithCalc) => void;
   onDelete: (s: StockWithCalc) => void;
+  onOpenTrade: () => void;
 }) {
   return (
     <tr>
@@ -209,7 +233,6 @@ function StockRow({
       <td style={{ color: "var(--color-text-muted)" }}>{s.symbol || "-"}</td>
       <td>{s.currency}</td>
       <td className="text-right">{formatPrice(s.current_price)}</td>
-      <td className="text-right">{formatPrice(s.previous_close)}</td>
       <td className="text-right">{s.shares.toLocaleString()}</td>
       <td className="text-right">{formatPrice(s.cost_price)}</td>
       <td className="text-right">
@@ -246,6 +269,16 @@ function StockRow({
         {s.dividend_yield_pct > 0
           ? formatPercent(s.dividend_yield_pct)
           : "-"}
+      </td>
+      {/* 交易操作列 */}
+      <td className="text-center">
+        <button
+          className="btn-icon trade-btn"
+          title="交易操作 (做T / 减仓 / 加仓)"
+          onClick={onOpenTrade}
+        >
+          <TrendingUp size={14} />
+        </button>
       </td>
       <td
         style={{

@@ -1,4 +1,4 @@
-# StockApp - 自选股分析
+# Shong-Stock
 
 本地股票资产管理桌面 App, 基于 Tauri + React + TypeScript + SQLite 构建.
 所有数据保存在本机, 不联网, 不上传任何数据.

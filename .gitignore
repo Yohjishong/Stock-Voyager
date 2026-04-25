@@ -24,6 +24,3 @@ Thumbs.db
 # Logs
 *.log
 npm-debug.log*
-
-# LLM context file (optional, remove this line if you want to track it)
-llm.readme

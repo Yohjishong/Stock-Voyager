@@ -2,14 +2,18 @@ import { useState, useEffect, useCallback } from "react";
 import {
   RefreshCw,
   Plus,
-  Upload,
-  Download,
-  Wallet,
+  ArrowDownUp,
 } from "lucide-react";
 import { Stock, StockWithCalc } from "./types/stock";
 import { calcStock, calcSummary } from "./lib/calculations";
 import { listStocks, createStock, updateStock, deleteStock } from "./services/stockService";
-import { getNetCash, setNetCash } from "./services/settingsService";
+import { TradePayload } from "./components/StockTradeDialog";
+import {
+  getCashCny,
+  setCashCny,
+  getInvestedCapitalCny,
+  setInvestedCapitalCny,
+} from "./services/settingsService";
 import {
   exportStocksCsv,
   exportStocksJson,
@@ -21,9 +25,10 @@ import {
 import SummaryCards from "./components/SummaryCards";
 import StockTable from "./components/StockTable";
 import StockForm from "./components/StockForm";
-import CashSettingsDialog from "./components/CashSettingsDialog";
 import ImportExportPanel from "./components/ImportExportPanel";
 import ConfirmDialog from "./components/ConfirmDialog";
+import CashBalanceDialog from "./components/CashBalanceDialog";
+import InvestedCapitalControl from "./components/InvestedCapitalControl";
 
 // ===== Toast =====
 interface ToastItem {
@@ -57,7 +62,8 @@ export default function App() {
   const { toasts, show } = useToast();
 
   const [stocks, setStocks] = useState<Stock[]>([]);
-  const [netCash, setNetCashState] = useState(0);
+  const [cash, setCash] = useState(0);
+  const [investedCapital, setInvestedCapital] = useState(0);
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
 
@@ -65,22 +71,24 @@ export default function App() {
   const [showForm, setShowForm] = useState(false);
   const [editStock, setEditStock] = useState<Stock | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<StockWithCalc | null>(null);
-  const [showCash, setShowCash] = useState(false);
   const [showIE, setShowIE] = useState(false);
+  const [showCashDialog, setShowCashDialog] = useState(false);
 
   // Computed
   const stocksWithCalc: StockWithCalc[] = stocks.map(calcStock);
-  const stats = calcSummary(stocksWithCalc, netCash);
+  const stats = calcSummary(stocksWithCalc, cash, investedCapital);
 
   async function loadData() {
     setLoading(true);
     try {
-      const [stockList, cash] = await Promise.all([
+      const [stockList, cashVal, investedVal] = await Promise.all([
         listStocks(),
-        getNetCash(),
+        getCashCny(),
+        getInvestedCapitalCny(),
       ]);
       setStocks(stockList);
-      setNetCashState(cash);
+      setCash(cashVal);
+      setInvestedCapital(investedVal);
     } catch (err) {
       show(`加载数据失败: ${err}`, "error");
     } finally {
@@ -146,16 +154,65 @@ export default function App() {
     }
   }
 
-  // ----- 现金设置 -----
-  async function handleSaveCash(amount: number) {
+  async function handleSaveCashBalance(amount: number) {
     setActionLoading(true);
     try {
-      await setNetCash(amount);
-      setNetCashState(amount);
-      show("现金设置已保存", "success");
-      setShowCash(false);
+      await setCashCny(amount);
+      setCash(amount);
+      show("现金已更新", "success");
+      setShowCashDialog(false);
     } catch (err) {
-      show(`保存现金失败: ${err}`, "error");
+      show(`保存失败: ${err}`, "error");
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  async function handleRecharge(amount: number) {
+    setActionLoading(true);
+    try {
+      const next = investedCapital + amount;
+      await setInvestedCapitalCny(next);
+      setInvestedCapital(next);
+      show("已充值并增加投入资金", "success");
+    } catch (err) {
+      show(`操作失败: ${err}`, "error");
+      throw err;
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  async function handleWithdraw(amount: number) {
+    setActionLoading(true);
+    try {
+      const next = Math.max(0, investedCapital - amount);
+      await setInvestedCapitalCny(next);
+      setInvestedCapital(next);
+      show("已提现并减少投入资金", "success");
+    } catch (err) {
+      show(`操作失败: ${err}`, "error");
+      throw err;
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  // ----- 交易操作 (做T / 减仓 / 加仓) -----
+  async function handleTradeConfirm(stock: StockWithCalc, payload: TradePayload) {
+    setActionLoading(true);
+    try {
+      const updated = await updateStock({
+        ...stock,
+        shares: payload.newShares,
+        cost_price: payload.newCostPrice,
+        updated_at: "",
+      });
+      setStocks((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
+      const label = payload.mode === "t_trade" ? "做T" : payload.mode === "reduce" ? "减仓" : "加仓";
+      show(`${label}操作已保存`, "success");
+    } catch (err) {
+      show(`操作失败: ${err}`, "error");
     } finally {
       setActionLoading(false);
     }
@@ -182,8 +239,15 @@ export default function App() {
     <div className="app-layout">
       {/* Navbar */}
       <nav className="navbar">
-        <span className="navbar-brand">自选股分析</span>
+        <span className="navbar-brand">Stock Voyager</span>
         <div className="navbar-actions">
+          <InvestedCapitalControl
+            investedCapital={investedCapital}
+            disabled={loading || actionLoading}
+            saving={actionLoading}
+            onRecharge={handleRecharge}
+            onWithdraw={handleWithdraw}
+          />
           <button
             className="btn btn-ghost"
             onClick={loadData}
@@ -201,33 +265,25 @@ export default function App() {
             className="btn btn-ghost"
             onClick={() => setShowIE(true)}
           >
-            <Upload size={14} />
-            导入
-          </button>
-          <button
-            className="btn btn-ghost"
-            onClick={() => setShowIE(true)}
-          >
-            <Download size={14} />
-            导出
-          </button>
-          <button
-            className="btn btn-ghost"
-            onClick={() => setShowCash(true)}
-          >
-            <Wallet size={14} />
-            现金设置
+            <ArrowDownUp size={14} />
+            导入/导出
           </button>
         </div>
       </nav>
 
       {/* Main */}
       <main className="main-content">
-        <SummaryCards stats={stats} totalCount={stocks.length} />
+        <SummaryCards
+          stats={stats}
+          totalCount={stocks.length}
+          onTotalAssetsClick={() => setShowCashDialog(true)}
+        />
         <StockTable
           stocks={stocksWithCalc}
           onEdit={openEdit}
           onDelete={openDelete}
+          onTradeConfirm={(stock, payload) => handleTradeConfirm(stock, payload)}
+          tradeLoading={actionLoading}
         />
       </main>
 
@@ -256,12 +312,12 @@ export default function App() {
         />
       )}
 
-      {/* 现金设置 */}
-      {showCash && (
-        <CashSettingsDialog
-          currentNetCash={netCash}
-          onSave={handleSaveCash}
-          onClose={() => setShowCash(false)}
+      {showCashDialog && (
+        <CashBalanceDialog
+          cash={cash}
+          marketValue={stats.total_market_value}
+          onSave={handleSaveCashBalance}
+          onClose={() => setShowCashDialog(false)}
           saving={actionLoading}
         />
       )}

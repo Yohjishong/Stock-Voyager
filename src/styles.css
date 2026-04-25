@@ -60,7 +60,91 @@ body {
 
 .navbar-actions {
   display: flex;
+  align-items: center;
   gap: 8px;
+}
+
+.navbar-invested-wrap {
+  position: relative;
+  z-index: 50;
+  margin-right: 8px;
+}
+
+.navbar-invested-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--color-nav-text);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: inherit;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.navbar-invested-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.navbar-invested-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.navbar-invested-label {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.75);
+  font-weight: 500;
+}
+
+.navbar-invested-value {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.navbar-invested-btn > svg:last-of-type {
+  flex-shrink: 0;
+  opacity: 0.85;
+  transition: transform 0.2s ease;
+}
+
+.navbar-chevron-open {
+  transform: rotate(180deg);
+}
+
+.navbar-invested-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  min-width: 140px;
+  padding: 4px 0;
+  border-radius: 8px;
+  background: #252b3d;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.navbar-invested-menu-item {
+  display: block;
+  width: 100%;
+  padding: 10px 14px;
+  border: none;
+  background: none;
+  color: var(--color-nav-text);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.navbar-invested-menu-item:hover {
+  background: rgba(255, 255, 255, 0.08);
 }
 
 /* ===== Buttons ===== */
@@ -148,14 +232,20 @@ body {
 /* ===== Summary Cards ===== */
 .summary-cards {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(6, 1fr);
   gap: 12px;
   margin-bottom: 20px;
 }
 
 @media (max-width: 1400px) {
   .summary-cards {
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 720px) {
+  .summary-cards {
+    grid-template-columns: repeat(2, 1fr);
   }
 }
 
@@ -165,6 +255,21 @@ body {
   padding: 14px 16px;
   box-shadow: var(--shadow-card);
   border: 1px solid var(--color-border);
+}
+
+button.summary-card--clickable {
+  display: block;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+button.summary-card--clickable:hover {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.15);
 }
 
 .summary-card-label {
@@ -343,6 +448,10 @@ body {
   flex-direction: column;
 }
 
+.cash-balance-modal {
+  max-width: 420px;
+}
+
 .modal-header {
   display: flex;
   align-items: center;
@@ -455,6 +564,125 @@ body {
   max-width: 400px;
 }
 
+/* ===== Trade Dialog ===== */
+.trade-dialog {
+  max-width: 500px;
+}
+
+.trade-mode-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.trade-mode-tab {
+  flex: 1;
+  padding: 7px 0;
+  border-radius: 6px;
+  border: 1px solid var(--color-border);
+  background: #f8fafc;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.trade-mode-tab:hover {
+  background: #eef2ff;
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.trade-mode-tab.active {
+  background: var(--color-primary);
+  color: #fff;
+  border-color: var(--color-primary);
+}
+
+.trade-hint {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  line-height: 1.55;
+  margin-bottom: 12px;
+  padding: 8px 10px;
+  background: #f8fafc;
+  border-radius: 6px;
+  border-left: 3px solid var(--color-border);
+}
+
+.trade-current-info {
+  display: flex;
+  gap: 20px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+  margin-bottom: 2px;
+}
+
+.trade-current-info strong {
+  color: var(--color-text);
+}
+
+.trade-preview {
+  margin-top: 16px;
+  padding: 12px 14px;
+  background: #f0f7ff;
+  border-radius: 6px;
+  border: 1px solid #c3d9f7;
+}
+
+.trade-preview-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 8px;
+}
+
+.trade-preview-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 13px;
+  padding: 3px 0;
+  border-bottom: 1px solid #dbeafe;
+}
+
+.trade-preview-row:last-child {
+  border-bottom: none;
+}
+
+.trade-preview-row > span:first-child {
+  color: var(--color-text-muted);
+}
+
+/* 交易按钮 (表格行内) */
+.btn-icon.trade-btn {
+  color: var(--color-primary);
+}
+
+/* 做T 内部分区标题 */
+.trade-section-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 8px;
+}
+
+/* T 利润实时提示 */
+.trade-t-profit {
+  margin-top: 10px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  font-size: 13px;
+}
+
 .confirm-message {
   font-size: 14px;
   line-height: 1.6;
@@ -536,11 +764,6 @@ body {
 @keyframes slideIn {
   from { transform: translateX(40px); opacity: 0; }
   to { transform: translateX(0); opacity: 1; }
-}
-
-/* ===== Cash Settings ===== */
-.cash-modal {
-  max-width: 380px;
 }
 
 /* ===== Scrollbar ===== */

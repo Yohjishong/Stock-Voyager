@@ -2,6 +2,11 @@ import { useState, useEffect } from "react";
 import { X } from "lucide-react";
 import { Stock, StockFormData, MarketType, CurrencyType } from "../types/stock";
 import { validateStockForm, ValidationError } from "../lib/validators";
+import {
+  lookupBySymbol,
+  lookupByName,
+  STOCK_DICT,
+} from "../lib/stockDict";
 
 const MARKET_OPTIONS: MarketType[] = ["A股", "港股", "美股", "其他"];
 const CURRENCY_OPTIONS: CurrencyType[] = ["CNY", "HKD", "USD"];
@@ -67,6 +72,37 @@ export default function StockForm({ stock, onSave, onClose, saving }: Props) {
     >
   ) {
     const { name, value } = e.target;
+
+    // 代码输入: 精确匹配时自动填入名称和市场
+    if (name === "symbol") {
+      const entry = lookupBySymbol(value);
+      if (entry) {
+        setForm((prev) => ({
+          ...prev,
+          symbol: value,
+          name: entry.name,
+          market: entry.market,
+        }));
+        setErrors((prev) => prev.filter((er) => er.field !== "symbol" && er.field !== "name"));
+        return;
+      }
+    }
+
+    // 名称输入: 精确匹配时自动填入代码和市场
+    if (name === "name") {
+      const entry = lookupByName(value);
+      if (entry) {
+        setForm((prev) => ({
+          ...prev,
+          name: value,
+          symbol: entry.symbol,
+          market: entry.market,
+        }));
+        setErrors((prev) => prev.filter((er) => er.field !== "name" && er.field !== "symbol"));
+        return;
+      }
+    }
+
     setForm((prev) => ({ ...prev, [name]: value }));
     setErrors((prev) => prev.filter((er) => er.field !== name));
   }
@@ -110,6 +146,24 @@ export default function StockForm({ stock, onSave, onClose, saving }: Props) {
           </button>
         </div>
 
+        {/* datalist: 代码候选 */}
+        <datalist id="stock-symbol-list">
+          {STOCK_DICT.map((e) => (
+            <option key={e.symbol} value={e.symbol}>
+              {e.name}
+            </option>
+          ))}
+        </datalist>
+
+        {/* datalist: 名称候选 */}
+        <datalist id="stock-name-list">
+          {STOCK_DICT.map((e) => (
+            <option key={e.name} value={e.name}>
+              {e.symbol}
+            </option>
+          ))}
+        </datalist>
+
         <form onSubmit={handleSubmit} style={{ display: "contents" }}>
           <div className="modal-body">
             <div className="form-grid">
@@ -124,6 +178,8 @@ export default function StockForm({ stock, onSave, onClose, saving }: Props) {
                   value={form.name}
                   onChange={handleChange}
                   placeholder="例如: 贵州茅台"
+                  list="stock-name-list"
+                  autoComplete="off"
                 />
                 {getError("name") && (
                   <span className="form-error">{getError("name")}</span>
@@ -139,6 +195,8 @@ export default function StockForm({ stock, onSave, onClose, saving }: Props) {
                   value={form.symbol}
                   onChange={handleChange}
                   placeholder="例如: 600519"
+                  list="stock-symbol-list"
+                  autoComplete="off"
                 />
               </div>
 

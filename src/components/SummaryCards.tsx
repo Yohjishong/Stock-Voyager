@@ -6,11 +6,13 @@ interface CardProps {
   value: string;
   valueColor?: string;
   subValue?: string;
+  /** 可点击 (例如总资产调现金) */
+  onClick?: () => void;
 }
 
-function Card({ label, value, valueColor, subValue }: CardProps) {
-  return (
-    <div className="summary-card">
+function Card({ label, value, valueColor, subValue, onClick }: CardProps) {
+  const inner = (
+    <>
       <div className="summary-card-label">{label}</div>
       <div
         className="summary-card-value"
@@ -23,22 +25,44 @@ function Card({ label, value, valueColor, subValue }: CardProps) {
           {subValue}
         </div>
       )}
-    </div>
+    </>
   );
+
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        className="summary-card summary-card--clickable"
+        onClick={onClick}
+      >
+        {inner}
+      </button>
+    );
+  }
+
+  return <div className="summary-card">{inner}</div>;
 }
 
 interface Props {
   stats: SummaryStats;
   totalCount: number;
+  onTotalAssetsClick: () => void;
 }
 
-export default function SummaryCards({ stats, totalCount }: Props) {
+export default function SummaryCards({
+  stats,
+  totalCount,
+  onTotalAssetsClick,
+}: Props) {
   const {
     total_market_value,
     total_day_change,
     total_profit_loss,
-    net_assets,
-    net_cash,
+    total_assets,
+    total_return,
+    total_return_pct,
+    invested_capital,
+    cash,
     total_dividend,
   } = stats;
 
@@ -52,16 +76,31 @@ export default function SummaryCards({ stats, totalCount }: Props) {
       ? total_profit_loss / (total_market_value - total_profit_loss)
       : 0;
 
-  // 整体静态股息率 = 去年分红总额 / 持仓市值
   const overallDividendYield =
     total_market_value > 0 ? total_dividend / total_market_value : 0;
+
+  const returnSub =
+    invested_capital > 0
+      ? `相对投入资金 ${formatPercent(total_return_pct)}`
+      : "请先设置右上角投入资金";
 
   return (
     <div className="summary-cards">
       <Card
+        label="总资产"
+        value={`¥${formatNumber(total_assets)}`}
+        subValue={`${totalCount} 只股票 · 现金 ¥${formatNumber(cash)} · 点击调整现金`}
+        onClick={onTotalAssetsClick}
+      />
+      <Card
+        label="总收益"
+        value={`${total_return >= 0 ? "+" : ""}¥${formatNumber(total_return)}`}
+        valueColor={changeColor(total_return)}
+        subValue={returnSub}
+      />
+      <Card
         label="持仓市值"
         value={`¥${formatNumber(total_market_value)}`}
-        subValue={`${totalCount} 只股票`}
       />
       <Card
         label="当日涨跌"
@@ -70,18 +109,10 @@ export default function SummaryCards({ stats, totalCount }: Props) {
         subValue={formatPercent(dayChangePct)}
       />
       <Card
-        label="净利润"
+        label="持仓收益"
         value={`${total_profit_loss >= 0 ? "+" : ""}¥${formatNumber(total_profit_loss)}`}
         valueColor={changeColor(total_profit_loss)}
         subValue={formatPercent(profitLossPct)}
-      />
-      <Card
-        label="净资产"
-        value={`¥${formatNumber(net_assets)}`}
-      />
-      <Card
-        label="净现金"
-        value={`¥${formatNumber(net_cash)}`}
       />
       <Card
         label="静态股息"

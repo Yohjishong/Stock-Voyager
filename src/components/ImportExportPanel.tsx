@@ -45,7 +45,7 @@ export default function ImportExportPanel({
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-box" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <span className="modal-title">导入 / 导出</span>
+          <span className="modal-title">导入/导出</span>
           <button className="modal-close" onClick={onClose}>
             <X size={16} />
           </button>
