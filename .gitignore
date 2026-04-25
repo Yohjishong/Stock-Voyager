@@ -1,0 +1,29 @@
+# Node.js
+node_modules/
+dist/
+dist-ssr/
+
+# Rust / Tauri build artifacts
+src-tauri/target/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# LLM context file (optional, remove this line if you want to track it)
+llm.readme
