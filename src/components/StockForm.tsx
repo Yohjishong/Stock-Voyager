@@ -20,8 +20,13 @@ const DEFAULT_FORM: StockFormData = {
   previous_close: "",
   shares: "",
   cost_price: "",
-  pe: "",
   dividend_per_10_shares: "",
+  total_shares: "",
+  net_profit_q1: "",
+  net_profit_q2: "",
+  net_profit_q3: "",
+  net_profit_q4: "",
+  net_assets_parent: "",
   note: "",
 };
 
@@ -35,11 +40,16 @@ function stockToForm(stock: Stock): StockFormData {
     previous_close: stock.previous_close > 0 ? String(stock.previous_close) : "",
     shares: stock.shares > 0 ? String(stock.shares) : "",
     cost_price: stock.cost_price > 0 ? String(stock.cost_price) : "",
-    pe: stock.pe > 0 ? String(stock.pe) : "",
     dividend_per_10_shares:
       stock.dividend_per_10_shares > 0
         ? String(stock.dividend_per_10_shares)
         : "",
+    total_shares: (stock.total_shares ?? 0) > 0 ? String(stock.total_shares) : "",
+    net_profit_q1: (stock.net_profit_q1 ?? 0) !== 0 ? String(stock.net_profit_q1) : "",
+    net_profit_q2: (stock.net_profit_q2 ?? 0) !== 0 ? String(stock.net_profit_q2) : "",
+    net_profit_q3: (stock.net_profit_q3 ?? 0) !== 0 ? String(stock.net_profit_q3) : "",
+    net_profit_q4: (stock.net_profit_q4 ?? 0) !== 0 ? String(stock.net_profit_q4) : "",
+    net_assets_parent: (stock.net_assets_parent ?? 0) > 0 ? String(stock.net_assets_parent) : "",
     note: stock.note || "",
   };
 }
@@ -124,9 +134,17 @@ export default function StockForm({ stock, onSave, onClose, saving }: Props) {
       previous_close: form.previous_close ? parseFloat(form.previous_close) : 0,
       shares: form.shares ? parseFloat(form.shares) : 0,
       cost_price: form.cost_price ? parseFloat(form.cost_price) : 0,
-      pe: form.pe ? parseFloat(form.pe) : 0,
+      pe: 0,  // 旧字段保留兼容性, 不再由用户填写
       dividend_per_10_shares: form.dividend_per_10_shares
         ? parseFloat(form.dividend_per_10_shares)
+        : 0,
+      total_shares: form.total_shares ? parseFloat(form.total_shares) : 0,
+      net_profit_q1: form.net_profit_q1 ? parseFloat(form.net_profit_q1) : 0,
+      net_profit_q2: form.net_profit_q2 ? parseFloat(form.net_profit_q2) : 0,
+      net_profit_q3: form.net_profit_q3 ? parseFloat(form.net_profit_q3) : 0,
+      net_profit_q4: form.net_profit_q4 ? parseFloat(form.net_profit_q4) : 0,
+      net_assets_parent: form.net_assets_parent
+        ? parseFloat(form.net_assets_parent)
         : 0,
       note: form.note.trim(),
     };
@@ -302,23 +320,6 @@ export default function StockForm({ stock, onSave, onClose, saving }: Props) {
                 )}
               </div>
 
-              {/* PE */}
-              <div className="form-group">
-                <label className="form-label">PE</label>
-                <input
-                  className={`form-input ${getError("pe") ? "error" : ""}`}
-                  name="pe"
-                  value={form.pe}
-                  onChange={handleChange}
-                  placeholder="0.0"
-                  type="number"
-                  step="any"
-                />
-                {getError("pe") && (
-                  <span className="form-error">{getError("pe")}</span>
-                )}
-              </div>
-
               {/* 每十股分红 */}
               <div className="form-group">
                 <label className="form-label">每十股分红 (去年)</label>
@@ -337,6 +338,102 @@ export default function StockForm({ stock, onSave, onClose, saving }: Props) {
                 )}
                 <span className="form-hint">
                   去年每10股派息金额, 分红总额和股息率将自动计算
+                </span>
+              </div>
+
+              {/* 公司总股本 */}
+              <div className="form-group">
+                <label className="form-label">公司总股本 (亿股)</label>
+                <input
+                  className="form-input"
+                  name="total_shares"
+                  value={form.total_shares}
+                  onChange={handleChange}
+                  placeholder="单位: 亿股, 例如 100 = 100亿股"
+                  type="number"
+                  step="any"
+                  min="0"
+                />
+                <span className="form-hint">
+                  单位: 亿股. 总市值 = 股价 × 总股本(亿), 结果单位为亿元
+                </span>
+              </div>
+
+              {/* 最近一季度归母净利润 */}
+              <div className="form-group">
+                <label className="form-label">最近一季归母净利润</label>
+                <input
+                  className="form-input"
+                  name="net_profit_q1"
+                  value={form.net_profit_q1}
+                  onChange={handleChange}
+                  placeholder="单季度利润, 非累计"
+                  type="number"
+                  step="any"
+                />
+                <span className="form-hint">最新披露的单季度归母净利润 (非累计值)</span>
+              </div>
+
+              {/* 前二季度归母净利润 */}
+              <div className="form-group">
+                <label className="form-label">前二季归母净利润</label>
+                <input
+                  className="form-input"
+                  name="net_profit_q2"
+                  value={form.net_profit_q2}
+                  onChange={handleChange}
+                  placeholder="单季度利润, 非累计"
+                  type="number"
+                  step="any"
+                />
+                <span className="form-hint">往前第 2 个季度的单季度归母净利润</span>
+              </div>
+
+              {/* 前三季度归母净利润 */}
+              <div className="form-group">
+                <label className="form-label">前三季归母净利润</label>
+                <input
+                  className="form-input"
+                  name="net_profit_q3"
+                  value={form.net_profit_q3}
+                  onChange={handleChange}
+                  placeholder="单季度利润, 非累计"
+                  type="number"
+                  step="any"
+                />
+                <span className="form-hint">往前第 3 个季度的单季度归母净利润</span>
+              </div>
+
+              {/* 前四季度归母净利润 */}
+              <div className="form-group">
+                <label className="form-label">前四季归母净利润</label>
+                <input
+                  className="form-input"
+                  name="net_profit_q4"
+                  value={form.net_profit_q4}
+                  onChange={handleChange}
+                  placeholder="单季度利润, 非累计"
+                  type="number"
+                  step="any"
+                />
+                <span className="form-hint">往前第 4 个季度的单季度归母净利润 (TTM = Q1+Q2+Q3+Q4)</span>
+              </div>
+
+              {/* 最新归母净资产 */}
+              <div className="form-group">
+                <label className="form-label">最新归母净资产</label>
+                <input
+                  className="form-input"
+                  name="net_assets_parent"
+                  value={form.net_assets_parent}
+                  onChange={handleChange}
+                  placeholder="0 (归属于母公司股东权益)"
+                  type="number"
+                  step="any"
+                  min="0"
+                />
+                <span className="form-hint">
+                  最新归属于母公司股东权益, 用于计算 PB 和 ROE
                 </span>
               </div>
 

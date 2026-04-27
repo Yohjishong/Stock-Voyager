@@ -11,6 +11,8 @@ import {
   formatPercent,
   formatPrice,
   formatDateTime,
+  formatValuation,
+  formatYi,
   changeColor,
 } from "../lib/format";
 import StockTradeDialog, { TradePayload } from "./StockTradeDialog";
@@ -21,6 +23,7 @@ interface Props {
   stocks: StockWithCalc[];
   onEdit: (stock: StockWithCalc) => void;
   onDelete: (stock: StockWithCalc) => void;
+  onOpenDetail: (stock: StockWithCalc) => void;
   onTradeConfirm: (stock: StockWithCalc, payload: TradePayload) => Promise<void>;
   tradeLoading?: boolean;
 }
@@ -35,7 +38,14 @@ function SortIcon({ field, sort }: { field: SortField; sort: SortState }) {
   );
 }
 
-export default function StockTable({ stocks, onEdit, onDelete, onTradeConfirm, tradeLoading }: Props) {
+export default function StockTable({
+  stocks,
+  onEdit,
+  onDelete,
+  onOpenDetail,
+  onTradeConfirm,
+  tradeLoading,
+}: Props) {
   const [search, setSearch] = useState("");
   const [marketFilter, setMarketFilter] = useState<MarketType | "全部">("全部");
   const [sort, setSort] = useState<SortState>({
@@ -77,6 +87,11 @@ export default function StockTable({ stocks, onEdit, onDelete, onTradeConfirm, t
         case "profit_loss": av = a.profit_loss; bv = b.profit_loss; break;
         case "dividend_yield_pct": av = a.dividend_yield_pct; bv = b.dividend_yield_pct; break;
         case "dividend_total": av = a.dividend_total; bv = b.dividend_total; break;
+        case "company_market_cap": av = a.company_market_cap; bv = b.company_market_cap; break;
+        case "pe_dynamic": av = a.pe_dynamic ?? -Infinity; bv = b.pe_dynamic ?? -Infinity; break;
+        case "pe_ttm": av = a.pe_ttm ?? -Infinity; bv = b.pe_ttm ?? -Infinity; break;
+        case "pb": av = a.pb ?? -Infinity; bv = b.pb ?? -Infinity; break;
+        case "roe": av = a.roe ?? -Infinity; bv = b.roe ?? -Infinity; break;
         case "updated_at": av = a.updated_at; bv = b.updated_at; break;
       }
       if (typeof av === "string" && typeof bv === "string") {
@@ -150,6 +165,7 @@ export default function StockTable({ stocks, onEdit, onDelete, onTradeConfirm, t
             <thead>
               <tr>
                 <Th label="股票名称" field="name" />
+                <th className="text-center">交易</th>
                 <Th label="市场" field="market" />
                 <th>代码</th>
                 <th>货币</th>
@@ -157,24 +173,27 @@ export default function StockTable({ stocks, onEdit, onDelete, onTradeConfirm, t
                 <th className="text-right">持仓数量</th>
                 <th className="text-right">成本价</th>
                 <Th label="持仓市值" field="market_value" className="text-right" />
+                <Th label="市值" field="company_market_cap" className="text-right" />
                 <Th label="当日涨跌" field="day_change_value" className="text-right" />
                 <Th label="涨跌幅" field="day_change_pct" className="text-right" />
                 <Th label="浮动盈亏" field="profit_loss" className="text-right" />
                 <th className="text-right">盈亏率</th>
-                <th className="text-right">PE</th>
+                <Th label="动态PE" field="pe_dynamic" className="text-right" />
+                <Th label="PE_TTM" field="pe_ttm" className="text-right" />
+                <Th label="PB" field="pb" className="text-right" />
+                <Th label="ROE" field="roe" className="text-right" />
                 <th className="text-right">每十股分红</th>
                 <Th label="分红总额" field="dividend_total" className="text-right" />
                 <Th label="静态股息率" field="dividend_yield_pct" className="text-right" />
-                <th className="text-center">交易</th>
                 <th>备注</th>
-                <th>更新时间</th>
+                <Th label="更新时间" field="updated_at" />
                 <th className="text-center">操作</th>
               </tr>
             </thead>
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={20}>
+                  <td colSpan={24}>
                     <div className="empty-state">
                       <div className="empty-state-icon">📋</div>
                       <div className="empty-state-text">
@@ -192,6 +211,7 @@ export default function StockTable({ stocks, onEdit, onDelete, onTradeConfirm, t
                     stock={s}
                     onEdit={onEdit}
                     onDelete={onDelete}
+                    onOpenDetail={() => onOpenDetail(s)}
                     onOpenTrade={() => setTradeTarget(s)}
                   />
                 ))
@@ -217,16 +237,32 @@ function StockRow({
   stock: s,
   onEdit,
   onDelete,
+  onOpenDetail,
   onOpenTrade,
 }: {
   stock: StockWithCalc;
   onEdit: (s: StockWithCalc) => void;
   onDelete: (s: StockWithCalc) => void;
+  onOpenDetail: () => void;
   onOpenTrade: () => void;
 }) {
   return (
-    <tr>
+    <tr className="stock-row-clickable" onClick={onOpenDetail}>
       <td style={{ fontWeight: 500 }}>{s.name}</td>
+      {/* 交易操作列 */}
+      <td className="text-center">
+        <button
+          type="button"
+          className="btn-icon trade-btn"
+          title="交易操作 (做T / 减仓 / 加仓)"
+          onClick={(e) => {
+            e.stopPropagation();
+            onOpenTrade();
+          }}
+        >
+          <TrendingUp size={14} />
+        </button>
+      </td>
       <td>
         <span className={`market-badge ${s.market}`}>{s.market}</span>
       </td>
@@ -235,8 +271,15 @@ function StockRow({
       <td className="text-right">{formatPrice(s.current_price)}</td>
       <td className="text-right">{s.shares.toLocaleString()}</td>
       <td className="text-right">{formatPrice(s.cost_price)}</td>
+      {/* 持仓市值 = 股价 × 持仓数量 */}
       <td className="text-right">
         {formatCurrency(s.market_value, s.currency)}
+      </td>
+      {/* 公司总市值 = 股价 × 总股本(亿), 单位: 亿元 */}
+      <td className="text-right">
+        {s.company_market_cap > 0
+          ? formatYi(s.company_market_cap, s.currency)
+          : "-"}
       </td>
       <td className="text-right" style={{ color: changeColor(s.day_change_value) }}>
         {s.day_change_value >= 0 ? "+" : ""}
@@ -254,7 +297,14 @@ function StockRow({
         {s.profit_loss_pct >= 0 ? "+" : ""}
         {formatPercent(s.profit_loss_pct)}
       </td>
-      <td className="text-right">{s.pe > 0 ? s.pe.toFixed(1) : "-"}</td>
+      <td className="text-right">{formatValuation(s.pe_dynamic)}</td>
+      <td className="text-right">{formatValuation(s.pe_ttm)}</td>
+      <td className="text-right">{formatValuation(s.pb)}</td>
+      <td className="text-right">
+        {s.roe !== null && s.roe !== undefined
+          ? formatPercent(s.roe)
+          : "N/A"}
+      </td>
       <td className="text-right">
         {s.dividend_per_10_shares > 0
           ? formatCurrency(s.dividend_per_10_shares, s.currency)
@@ -269,16 +319,6 @@ function StockRow({
         {s.dividend_yield_pct > 0
           ? formatPercent(s.dividend_yield_pct)
           : "-"}
-      </td>
-      {/* 交易操作列 */}
-      <td className="text-center">
-        <button
-          className="btn-icon trade-btn"
-          title="交易操作 (做T / 减仓 / 加仓)"
-          onClick={onOpenTrade}
-        >
-          <TrendingUp size={14} />
-        </button>
       </td>
       <td
         style={{
@@ -297,16 +337,24 @@ function StockRow({
       <td className="text-center">
         <div style={{ display: "flex", gap: 4, justifyContent: "center" }}>
           <button
+            type="button"
             className="btn-icon edit"
             title="编辑"
-            onClick={() => onEdit(s)}
+            onClick={(e) => {
+              e.stopPropagation();
+              onEdit(s);
+            }}
           >
             <Edit2 size={14} />
           </button>
           <button
+            type="button"
             className="btn-icon delete"
             title="删除"
-            onClick={() => onDelete(s)}
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete(s);
+            }}
           >
             <Trash2 size={14} />
           </button>

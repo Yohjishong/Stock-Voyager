@@ -13,7 +13,7 @@
     "withGlobalTauri": false,
     "windows": [
       {
-        "title": "自选股分析",
+        "title": "Stock Voyager",
         "width": 1440,
         "height": 860,
         "minWidth": 1024,

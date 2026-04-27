@@ -3,6 +3,7 @@ node_modules/
 dist/
 dist-ssr/
 
+llm.md
 # Rust / Tauri build artifacts
 src-tauri/target/
 

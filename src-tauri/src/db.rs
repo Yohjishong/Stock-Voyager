@@ -41,12 +41,82 @@ pub fn init_db(db_path: &Path) -> Result<()> {
             market_value  REAL NOT NULL DEFAULT 0,
             created_at    TEXT NOT NULL,
             FOREIGN KEY (stock_id) REFERENCES stocks(id) ON DELETE CASCADE
+        );
+
+        CREATE TABLE IF NOT EXISTS operation_records (
+            id                      TEXT PRIMARY KEY,
+            stock_id                TEXT NOT NULL,
+            operation_type          TEXT NOT NULL,
+            operation_date          TEXT NOT NULL,
+            shares_delta            REAL NOT NULL DEFAULT 0,
+            price                   REAL NOT NULL DEFAULT 0,
+            amount                  REAL NOT NULL DEFAULT 0,
+            net_profit_per_share    REAL NOT NULL DEFAULT 0,
+            dividend_per_10_shares  REAL NOT NULL DEFAULT 0,
+            cash_amount             REAL NOT NULL DEFAULT 0,
+            shares_before           REAL NOT NULL DEFAULT 0,
+            shares_after            REAL NOT NULL DEFAULT 0,
+            cost_price_before       REAL NOT NULL DEFAULT 0,
+            cost_price_after        REAL NOT NULL DEFAULT 0,
+            note                    TEXT NOT NULL DEFAULT '',
+            created_at              TEXT NOT NULL,
+            updated_at              TEXT NOT NULL,
+            current_price_before    REAL NOT NULL DEFAULT 0,
+            current_price_after     REAL NOT NULL DEFAULT 0,
+            previous_close_before   REAL NOT NULL DEFAULT 0,
+            previous_close_after    REAL NOT NULL DEFAULT 0,
+            dividend_tax_bucket     TEXT NOT NULL DEFAULT '',
+            FOREIGN KEY (stock_id) REFERENCES stocks(id) ON DELETE CASCADE
+        );
+
+        CREATE TABLE IF NOT EXISTS stock_notes (
+            id          TEXT PRIMARY KEY,
+            stock_id    TEXT NOT NULL,
+            title       TEXT NOT NULL DEFAULT '',
+            content     TEXT NOT NULL DEFAULT '',
+            created_at  TEXT NOT NULL,
+            updated_at  TEXT NOT NULL,
+            FOREIGN KEY (stock_id) REFERENCES stocks(id) ON DELETE CASCADE
         );",
     )?;
 
     // 数据库迁移: 兼容旧表结构, 忽略列已存在的错误
     let _ = conn.execute_batch(
         "ALTER TABLE stocks ADD COLUMN dividend_per_10_shares REAL NOT NULL DEFAULT 0;",
+    );
+    let _ = conn.execute_batch(
+        "ALTER TABLE stocks ADD COLUMN total_shares REAL NOT NULL DEFAULT 0;",
+    );
+    let _ = conn.execute_batch(
+        "ALTER TABLE stocks ADD COLUMN net_profit_q1 REAL NOT NULL DEFAULT 0;",
+    );
+    let _ = conn.execute_batch(
+        "ALTER TABLE stocks ADD COLUMN net_profit_q2 REAL NOT NULL DEFAULT 0;",
+    );
+    let _ = conn.execute_batch(
+        "ALTER TABLE stocks ADD COLUMN net_profit_q3 REAL NOT NULL DEFAULT 0;",
+    );
+    let _ = conn.execute_batch(
+        "ALTER TABLE stocks ADD COLUMN net_profit_q4 REAL NOT NULL DEFAULT 0;",
+    );
+    let _ = conn.execute_batch(
+        "ALTER TABLE stocks ADD COLUMN net_assets_parent REAL NOT NULL DEFAULT 0;",
+    );
+
+    let _ = conn.execute_batch(
+        "ALTER TABLE operation_records ADD COLUMN current_price_before REAL NOT NULL DEFAULT 0;",
+    );
+    let _ = conn.execute_batch(
+        "ALTER TABLE operation_records ADD COLUMN current_price_after REAL NOT NULL DEFAULT 0;",
+    );
+    let _ = conn.execute_batch(
+        "ALTER TABLE operation_records ADD COLUMN previous_close_before REAL NOT NULL DEFAULT 0;",
+    );
+    let _ = conn.execute_batch(
+        "ALTER TABLE operation_records ADD COLUMN previous_close_after REAL NOT NULL DEFAULT 0;",
+    );
+    let _ = conn.execute_batch(
+        "ALTER TABLE operation_records ADD COLUMN dividend_tax_bucket TEXT NOT NULL DEFAULT '';",
     );
 
     Ok(())

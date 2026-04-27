@@ -26,6 +26,41 @@ export function calcStock(stock: Stock): StockWithCalc {
   const dividend_yield_pct =
     market_value > 0 ? dividend_total / market_value : 0;
 
+  // 公司总市值 = 股价 × 公司总股本 (非持仓数量)
+  const company_market_cap = stock.current_price * (stock.total_shares ?? 0);
+
+  // 最近单季归母净利润
+  const latest_quarter_net_profit_parent = stock.net_profit_q1 ?? 0;
+
+  // TTM 归母净利润 = 四个单季度之和
+  const ttm_net_profit_parent =
+    (stock.net_profit_q1 ?? 0) +
+    (stock.net_profit_q2 ?? 0) +
+    (stock.net_profit_q3 ?? 0) +
+    (stock.net_profit_q4 ?? 0);
+
+  // 动态 PE = 公司总市值 / 最近单季净利润, 分母 <= 0 时为 null
+  const pe_dynamic =
+    latest_quarter_net_profit_parent > 0
+      ? company_market_cap / latest_quarter_net_profit_parent
+      : null;
+
+  // PE_TTM = 公司总市值 / TTM 净利润, 分母 <= 0 时为 null
+  const pe_ttm =
+    ttm_net_profit_parent > 0
+      ? company_market_cap / ttm_net_profit_parent
+      : null;
+
+  const net_assets = stock.net_assets_parent ?? 0;
+
+  // PB = 公司总市值 / 归母净资产, 分母 <= 0 时为 null
+  const pb =
+    net_assets > 0 ? company_market_cap / net_assets : null;
+
+  // ROE = TTM 净利润 / 归母净资产, 分母 <= 0 时为 null
+  const roe =
+    net_assets > 0 ? ttm_net_profit_parent / net_assets : null;
+
   return {
     ...stock,
     market_value,
@@ -35,13 +70,21 @@ export function calcStock(stock: Stock): StockWithCalc {
     profit_loss_pct,
     dividend_total,
     dividend_yield_pct,
+    company_market_cap,
+    latest_quarter_net_profit_parent,
+    ttm_net_profit_parent,
+    pe_dynamic,
+    pe_ttm,
+    pb,
+    roe,
   };
 }
 
 export function calcSummary(
   stocks: StockWithCalc[],
   cash: number,
-  invested_capital: number
+  invested_capital: number,
+  total_dividend_received: number = 0
 ): SummaryStats {
   const total_market_value = stocks.reduce((s, x) => s + x.market_value, 0);
   const total_day_change = stocks.reduce((s, x) => s + x.day_change_value, 0);
@@ -58,6 +101,7 @@ export function calcSummary(
     total_day_change,
     total_profit_loss,
     total_dividend,
+    total_dividend_received,
     cash,
     invested_capital,
     total_assets,

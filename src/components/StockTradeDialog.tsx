@@ -1,14 +1,20 @@
 import { useState } from "react";
 import { X } from "lucide-react";
-import { StockWithCalc } from "../types/stock";
+import { OperationRecord, StockWithCalc } from "../types/stock";
 import { formatPrice } from "../lib/format";
 
 export type TradeMode = "t_trade" | "reduce" | "add";
+
+export type TradeOperationRecordInput = Omit<
+  OperationRecord,
+  "id" | "created_at" | "updated_at"
+>;
 
 export interface TradePayload {
   mode: TradeMode;
   newShares: number;
   newCostPrice: number;
+  operationRecord: TradeOperationRecordInput;
 }
 
 const MODE_LABELS: Record<TradeMode, string> = {
@@ -136,7 +142,98 @@ export default function StockTradeDialog({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!formValid || !preview) return;
-    await onConfirm({ mode, newShares: preview.newShares, newCostPrice: preview.newCostPrice });
+
+    const operation_date = new Date().toISOString();
+    const shares_before = stock.shares;
+    const cost_price_before = stock.cost_price;
+    const shares_after = preview.newShares;
+    const cost_price_after = preview.newCostPrice;
+
+    let operationRecord: TradeOperationRecordInput;
+
+    if (mode === "add") {
+      const amount = effectiveBuyShares * effectiveBuyPrice;
+      operationRecord = {
+        stock_id: stock.id,
+        operation_type: "add",
+        operation_date,
+        shares_delta: effectiveBuyShares,
+        price: effectiveBuyPrice,
+        amount,
+        net_profit_per_share: 0,
+        dividend_per_10_shares: 0,
+        cash_amount: -amount,
+        shares_before,
+        shares_after,
+        cost_price_before,
+        cost_price_after,
+        note: "",
+        current_price_before: stock.current_price,
+        current_price_after: stock.current_price,
+        previous_close_before: stock.previous_close,
+        previous_close_after: stock.previous_close,
+        dividend_tax_bucket: "",
+      };
+    } else if (mode === "reduce") {
+      const amount = effectiveSellShares * effectiveSellPrice;
+      operationRecord = {
+        stock_id: stock.id,
+        operation_type: "reduce",
+        operation_date,
+        shares_delta: -effectiveSellShares,
+        price: effectiveSellPrice,
+        amount,
+        net_profit_per_share: 0,
+        dividend_per_10_shares: 0,
+        cash_amount: amount,
+        shares_before,
+        shares_after,
+        cost_price_before,
+        cost_price_after,
+        note: "",
+        current_price_before: stock.current_price,
+        current_price_after: stock.current_price,
+        previous_close_before: stock.previous_close,
+        previous_close_after: stock.previous_close,
+        dividend_tax_bucket: "",
+      };
+    } else {
+      const tCash =
+        effectiveSellShares * effectiveSellPrice -
+        effectiveBuyShares * effectiveBuyPrice;
+      const net_profit_per_share =
+        effectiveSellShares > 0
+          ? tCash / effectiveSellShares
+          : 0;
+      operationRecord = {
+        stock_id: stock.id,
+        operation_type: "t_trade",
+        operation_date,
+        shares_delta: 0,
+        price: 0,
+        amount: 0,
+        net_profit_per_share,
+        dividend_per_10_shares: 0,
+        cash_amount: tCash,
+        shares_before,
+        shares_after,
+        cost_price_before,
+        cost_price_after,
+        note: "",
+        current_price_before: stock.current_price,
+        current_price_after: stock.current_price,
+        previous_close_before: stock.previous_close,
+        previous_close_after: stock.previous_close,
+        dividend_tax_bucket: "",
+      };
+    }
+
+    await onConfirm({
+      mode,
+      newShares: preview.newShares,
+      newCostPrice: preview.newCostPrice,
+      operationRecord,
+    });
   }
 
   return (

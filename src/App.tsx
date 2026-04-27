@@ -7,6 +7,7 @@ import {
 import { Stock, StockWithCalc } from "./types/stock";
 import { calcStock, calcSummary } from "./lib/calculations";
 import { listStocks, createStock, updateStock, deleteStock } from "./services/stockService";
+import { createOperationRecord, sumDividendCashReceived } from "./services/operationRecordService";
 import { TradePayload } from "./components/StockTradeDialog";
 import {
   getCashCny,
@@ -29,6 +30,7 @@ import ImportExportPanel from "./components/ImportExportPanel";
 import ConfirmDialog from "./components/ConfirmDialog";
 import CashBalanceDialog from "./components/CashBalanceDialog";
 import InvestedCapitalControl from "./components/InvestedCapitalControl";
+import StockDetailPage from "./components/StockDetailPage";
 
 // ===== Toast =====
 interface ToastItem {
@@ -73,22 +75,40 @@ export default function App() {
   const [deleteTarget, setDeleteTarget] = useState<StockWithCalc | null>(null);
   const [showIE, setShowIE] = useState(false);
   const [showCashDialog, setShowCashDialog] = useState(false);
+  const [selectedStockId, setSelectedStockId] = useState<string | null>(null);
+  const [dividendReceivedTotal, setDividendReceivedTotal] = useState(0);
 
   // Computed
   const stocksWithCalc: StockWithCalc[] = stocks.map(calcStock);
-  const stats = calcSummary(stocksWithCalc, cash, investedCapital);
+  const stats = calcSummary(
+    stocksWithCalc,
+    cash,
+    investedCapital,
+    dividendReceivedTotal
+  );
+  const detailStock = selectedStockId
+    ? stocksWithCalc.find((s) => s.id === selectedStockId) ?? null
+    : null;
+
+  useEffect(() => {
+    if (selectedStockId && !stocks.some((s) => s.id === selectedStockId)) {
+      setSelectedStockId(null);
+    }
+  }, [stocks, selectedStockId]);
 
   async function loadData() {
     setLoading(true);
     try {
-      const [stockList, cashVal, investedVal] = await Promise.all([
+      const [stockList, cashVal, investedVal, divRecv] = await Promise.all([
         listStocks(),
         getCashCny(),
         getInvestedCapitalCny(),
+        sumDividendCashReceived(),
       ]);
       setStocks(stockList);
       setCash(cashVal);
       setInvestedCapital(investedVal);
+      setDividendReceivedTotal(Number.isFinite(divRecv) ? divRecv : 0);
     } catch (err) {
       show(`加载数据失败: ${err}`, "error");
     } finally {
@@ -145,6 +165,9 @@ export default function App() {
     try {
       await deleteStock(deleteTarget.id);
       setStocks((prev) => prev.filter((s) => s.id !== deleteTarget.id));
+      if (selectedStockId === deleteTarget.id) {
+        setSelectedStockId(null);
+      }
       show("股票已删除", "success");
     } catch (err) {
       show(`删除失败: ${err}`, "error");
@@ -211,6 +234,11 @@ export default function App() {
       setStocks((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
       const label = payload.mode === "t_trade" ? "做T" : payload.mode === "reduce" ? "减仓" : "加仓";
       show(`${label}操作已保存`, "success");
+      try {
+        await createOperationRecord(payload.operationRecord);
+      } catch (recErr) {
+        show(`交易已保存, 但写入操作记录失败: ${recErr}`, "error");
+      }
     } catch (err) {
       show(`操作失败: ${err}`, "error");
     } finally {
@@ -273,18 +301,30 @@ export default function App() {
 
       {/* Main */}
       <main className="main-content">
-        <SummaryCards
-          stats={stats}
-          totalCount={stocks.length}
-          onTotalAssetsClick={() => setShowCashDialog(true)}
-        />
-        <StockTable
-          stocks={stocksWithCalc}
-          onEdit={openEdit}
-          onDelete={openDelete}
-          onTradeConfirm={(stock, payload) => handleTradeConfirm(stock, payload)}
-          tradeLoading={actionLoading}
-        />
+        {detailStock ? (
+          <StockDetailPage
+            stock={detailStock}
+            onBack={() => setSelectedStockId(null)}
+            onToast={show}
+            onStocksNeedReload={loadData}
+          />
+        ) : (
+          <>
+            <SummaryCards
+              stats={stats}
+              totalCount={stocks.length}
+              onTotalAssetsClick={() => setShowCashDialog(true)}
+            />
+            <StockTable
+              stocks={stocksWithCalc}
+              onEdit={openEdit}
+              onDelete={openDelete}
+              onOpenDetail={(s) => setSelectedStockId(s.id)}
+              onTradeConfirm={(stock, payload) => handleTradeConfirm(stock, payload)}
+              tradeLoading={actionLoading}
+            />
+          </>
+        )}
       </main>
 
       {/* 新增/编辑表单 */}

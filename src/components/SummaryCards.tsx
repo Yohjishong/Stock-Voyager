@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { SummaryStats } from "../types/stock";
 import { formatNumber, formatPercent, changeColor } from "../lib/format";
 
@@ -5,7 +6,7 @@ interface CardProps {
   label: string;
   value: string;
   valueColor?: string;
-  subValue?: string;
+  subValue?: ReactNode;
   /** 可点击 (例如总资产调现金) */
   onClick?: () => void;
 }
@@ -20,11 +21,11 @@ function Card({ label, value, valueColor, subValue, onClick }: CardProps) {
       >
         {value}
       </div>
-      {subValue && (
+      {subValue != null ? (
         <div style={{ fontSize: 11, color: "var(--color-text-muted)", marginTop: 2 }}>
           {subValue}
         </div>
-      )}
+      ) : null}
     </>
   );
 
@@ -64,6 +65,7 @@ export default function SummaryCards({
     invested_capital,
     cash,
     total_dividend,
+    total_dividend_received,
   } = stats;
 
   const dayChangePct =
@@ -117,7 +119,20 @@ export default function SummaryCards({
       <Card
         label="静态股息"
         value={`¥${formatNumber(total_dividend)}`}
-        subValue={`股息率 ${formatPercent(overallDividendYield)}`}
+        subValue={
+          <>
+            <div
+              style={{
+                fontWeight: 600,
+                color: "var(--color-text)",
+                marginBottom: 4,
+              }}
+            >
+              分红总收入 (税后到账累计) ¥{formatNumber(total_dividend_received)}
+            </div>
+            <div>去年名目股息对应整体 股息率 {formatPercent(overallDividendYield)}</div>
+          </>
+        }
       />
     </div>
   );
