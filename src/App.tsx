@@ -6,7 +6,14 @@ import {
 } from "lucide-react";
 import { Stock, StockWithCalc } from "./types/stock";
 import { calcStock, calcSummary } from "./lib/calculations";
-import { listStocks, createStock, updateStock, deleteStock } from "./services/stockService";
+import {
+  listStocks,
+  createStock,
+  updateStock,
+  deleteStock,
+  refreshFundamentals,
+  refreshPrices,
+} from "./services/stockService";
 import { createOperationRecord, sumDividendCashReceived } from "./services/operationRecordService";
 import { TradePayload } from "./components/StockTradeDialog";
 import {
@@ -246,6 +253,40 @@ export default function App() {
     }
   }
 
+  async function handleFundamentalsRefresh() {
+    setActionLoading(true);
+    try {
+      const result = await refreshFundamentals();
+      await loadData();
+      if (result.failed.length > 0) {
+        show(`基本面已更新 ${result.updated} 只, ${result.failed.length} 只失败`, "error");
+      } else {
+        show(`基本面已更新 ${result.updated} 只`, "success");
+      }
+    } catch (err) {
+      show(`基本面刷新失败: ${err}`, "error");
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  async function handlePriceRefresh() {
+    setActionLoading(true);
+    try {
+      const result = await refreshPrices();
+      await loadData();
+      if (result.failed.length > 0) {
+        show(`股价已更新 ${result.updated} 只, ${result.failed.length} 只失败`, "error");
+      } else {
+        show(`股价已更新 ${result.updated} 只`, "success");
+      }
+    } catch (err) {
+      show(`股价刷新失败: ${err}`, "error");
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
   // ----- 导入导出 -----
   async function wrapIE(fn: () => Promise<unknown>, successMsg: string) {
     setActionLoading(true);
@@ -278,12 +319,21 @@ export default function App() {
           />
           <button
             className="btn btn-ghost"
-            onClick={loadData}
-            disabled={loading}
-            title="刷新"
+            onClick={handleFundamentalsRefresh}
+            disabled={loading || actionLoading}
+            title="刷新 ROE / TTM 净利润 / 净资产 / 总股本"
           >
-            <RefreshCw size={14} className={loading ? "spin" : ""} />
-            刷新
+            <RefreshCw size={14} className={actionLoading ? "spin" : ""} />
+            基本面刷新
+          </button>
+          <button
+            className="btn btn-ghost"
+            onClick={handlePriceRefresh}
+            disabled={loading || actionLoading}
+            title="刷新当前股价和上一交易日收盘价"
+          >
+            <RefreshCw size={14} className={actionLoading ? "spin" : ""} />
+            股价刷新
           </button>
           <button className="btn btn-primary" onClick={openCreate}>
             <Plus size={14} />

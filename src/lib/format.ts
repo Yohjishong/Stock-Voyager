@@ -38,10 +38,10 @@ export function changeColor(value: number): string {
   return "var(--color-neutral)";
 }
 
-// 格式化亿元单位的金额 (总市值等), 保留 2 位小数
+// 将元格式化为亿元单位的金额 (总市值等), 保留 2 位小数
 export function formatYi(value: number, currency: CurrencyType = "CNY"): string {
   const symbol = CURRENCY_SYMBOL[currency] ?? "¥";
-  return `${symbol}${value.toFixed(2)}亿`;
+  return `${symbol}${(value / 1_0000_0000).toFixed(2)}亿`;
 }
 
 // 格式化 PE / PB 等估值倍数, null/undefined/NaN/Infinity 时显示 N/A

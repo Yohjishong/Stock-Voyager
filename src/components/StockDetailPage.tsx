@@ -146,7 +146,7 @@ export default function StockDetailPage({
         </div>
       </div>
 
-      <div className="table-panel detail-metrics-panel">
+      <div className="detail-metrics-panel">
         <div className="detail-metrics-grid">
           <Metric label="当前股价" value={formatPrice(stock.current_price)} />
           <Metric label="持仓数量" value={stock.shares.toLocaleString()} />
@@ -172,10 +172,6 @@ export default function StockDetailPage({
                 {formatPercent(stock.profit_loss_pct)}
               </span>
             }
-          />
-          <Metric
-            label="动态PE"
-            value={formatValuation(stock.pe_dynamic)}
           />
           <Metric label="PE_TTM" value={formatValuation(stock.pe_ttm)} />
           <Metric label="PB" value={formatValuation(stock.pb)} />
@@ -227,7 +223,7 @@ export default function StockDetailPage({
         </div>
 
         {tab === "records" && (
-          <div className="table-panel">
+          <div className="table-panel detail-records-panel">
             <div className="table-wrapper">
               {loadingRecords ? (
                 <div className="empty-state" style={{ padding: 40 }}>

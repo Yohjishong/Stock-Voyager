@@ -13,7 +13,11 @@ export interface Stock {
   cost_price: number;
   pe: number;                      // 旧字段, 保留兼容旧数据库, 不在页面展示
   dividend_per_10_shares: number;
-  total_shares: number;            // 公司总股本
+  total_share: number;             // 公司总股本 (股)
+  net_profit_ttm: number;          // TTM 归母净利润 (元)
+  net_assets: number;              // 归母净资产 (元)
+  roe: number;                     // ROE, 小数
+  total_shares: number;            // 旧字段, 保留兼容旧数据库/导入文件
   net_profit_q1: number;           // 最近第 1 个季度归母净利润 (单季度)
   net_profit_q2: number;           // 最近第 2 个季度归母净利润 (单季度)
   net_profit_q3: number;           // 最近第 3 个季度归母净利润 (单季度)
@@ -32,11 +36,9 @@ export interface StockWithCalc extends Stock {
   profit_loss_pct: number;                     // 浮动盈亏率
   dividend_total: number;                      // 去年分红总额
   dividend_yield_pct: number;                  // 静态股息率
-  company_market_cap: number;                  // 公司总市值 = 股价 × 总股本
-  pe_dynamic: number | null;                   // 动态 PE = 总市值 / 最近单季净利润
+  company_market_cap: number;                  // 公司总市值 = 股价 × 总股本 (元)
   pe_ttm: number | null;                       // PE_TTM = 总市值 / TTM 净利润
   pb: number | null;                           // PB = 总市值 / 归母净资产
-  roe: number | null;                          // ROE = TTM 净利润 / 归母净资产
 }
 
 export interface StockFormData {
@@ -49,12 +51,6 @@ export interface StockFormData {
   shares: string;
   cost_price: string;
   dividend_per_10_shares: string;
-  total_shares: string;
-  net_profit_q1: string;
-  net_profit_q2: string;
-  net_profit_q3: string;
-  net_profit_q4: string;
-  net_assets_parent: string;
   note: string;
 }
 
@@ -82,7 +78,6 @@ export type SortField =
   | "dividend_yield_pct"
   | "dividend_total"
   | "company_market_cap"
-  | "pe_dynamic"
   | "pe_ttm"
   | "pb"
   | "roe"

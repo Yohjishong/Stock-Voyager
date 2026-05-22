@@ -3,6 +3,12 @@ use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use chrono::Utc;
+use std::path::{Path, PathBuf};
+use std::process::Command;
+use tauri::{path::BaseDirectory, Manager};
+
+const STOCK_METRICS_SCRIPT: &str = "scripts/get_stock_metrics.py";
+const STOCK_PRICE_SCRIPT: &str = "scripts/get_value.py";
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Stock {
@@ -17,6 +23,10 @@ pub struct Stock {
     pub cost_price: f64,
     pub pe: f64,
     pub dividend_per_10_shares: f64,
+    pub total_share: f64,
+    pub net_profit_ttm: f64,
+    pub net_assets: f64,
+    pub roe: f64,
     pub total_shares: f64,
     pub net_profit_q1: f64,
     pub net_profit_q2: f64,
@@ -41,21 +51,26 @@ fn row_to_stock(row: &rusqlite::Row) -> rusqlite::Result<Stock> {
         cost_price: row.get(8)?,
         pe: row.get(9)?,
         dividend_per_10_shares: row.get(10)?,
-        total_shares: row.get(11)?,
-        net_profit_q1: row.get(12)?,
-        net_profit_q2: row.get(13)?,
-        net_profit_q3: row.get(14)?,
-        net_profit_q4: row.get(15)?,
-        net_assets_parent: row.get(16)?,
-        note: row.get(17)?,
-        created_at: row.get(18)?,
-        updated_at: row.get(19)?,
+        total_share: row.get(11)?,
+        net_profit_ttm: row.get(12)?,
+        net_assets: row.get(13)?,
+        roe: row.get(14)?,
+        total_shares: row.get(15)?,
+        net_profit_q1: row.get(16)?,
+        net_profit_q2: row.get(17)?,
+        net_profit_q3: row.get(18)?,
+        net_profit_q4: row.get(19)?,
+        net_assets_parent: row.get(20)?,
+        note: row.get(21)?,
+        created_at: row.get(22)?,
+        updated_at: row.get(23)?,
     })
 }
 
 const SELECT_FIELDS: &str =
     "id, name, symbol, market, currency, current_price, previous_close,
      shares, cost_price, pe, dividend_per_10_shares,
+     total_share, net_profit_ttm, net_assets, roe,
      total_shares, net_profit_q1, net_profit_q2, net_profit_q3, net_profit_q4,
      net_assets_parent, note, created_at, updated_at";
 
@@ -96,6 +111,10 @@ pub fn create_stock(
     let cost_price = stock["cost_price"].as_f64().unwrap_or(0.0);
     let pe = stock["pe"].as_f64().unwrap_or(0.0);
     let dividend_per_10_shares = stock["dividend_per_10_shares"].as_f64().unwrap_or(0.0);
+    let total_share = stock["total_share"].as_f64().unwrap_or(0.0);
+    let net_profit_ttm = stock["net_profit_ttm"].as_f64().unwrap_or(0.0);
+    let net_assets = stock["net_assets"].as_f64().unwrap_or(0.0);
+    let roe = stock["roe"].as_f64().unwrap_or(0.0);
     let total_shares = stock["total_shares"].as_f64().unwrap_or(0.0);
     let net_profit_q1 = stock["net_profit_q1"].as_f64().unwrap_or(0.0);
     let net_profit_q2 = stock["net_profit_q2"].as_f64().unwrap_or(0.0);
@@ -107,13 +126,15 @@ pub fn create_stock(
     conn.execute(
         "INSERT INTO stocks (id, name, symbol, market, currency, current_price,
             previous_close, shares, cost_price, pe, dividend_per_10_shares,
+            total_share, net_profit_ttm, net_assets, roe,
             total_shares, net_profit_q1, net_profit_q2, net_profit_q3, net_profit_q4,
             net_assets_parent, note, created_at, updated_at)
-         VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20)",
+         VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24)",
         params![
             id, name, symbol, market, currency,
             current_price, previous_close, shares, cost_price, pe,
             dividend_per_10_shares,
+            total_share, net_profit_ttm, net_assets, roe,
             total_shares, net_profit_q1, net_profit_q2, net_profit_q3, net_profit_q4,
             net_assets_parent, note, now, now
         ],
@@ -124,6 +145,7 @@ pub fn create_stock(
         id, name, symbol, market, currency,
         current_price, previous_close, shares, cost_price, pe,
         dividend_per_10_shares,
+        total_share, net_profit_ttm, net_assets, roe,
         total_shares, net_profit_q1, net_profit_q2, net_profit_q3, net_profit_q4,
         net_assets_parent, note,
         created_at: now.clone(), updated_at: now,
@@ -150,6 +172,10 @@ pub fn update_stock(
     let cost_price = stock["cost_price"].as_f64().unwrap_or(0.0);
     let pe = stock["pe"].as_f64().unwrap_or(0.0);
     let dividend_per_10_shares = stock["dividend_per_10_shares"].as_f64().unwrap_or(0.0);
+    let total_share = stock["total_share"].as_f64().unwrap_or(0.0);
+    let net_profit_ttm = stock["net_profit_ttm"].as_f64().unwrap_or(0.0);
+    let net_assets = stock["net_assets"].as_f64().unwrap_or(0.0);
+    let roe = stock["roe"].as_f64().unwrap_or(0.0);
     let total_shares = stock["total_shares"].as_f64().unwrap_or(0.0);
     let net_profit_q1 = stock["net_profit_q1"].as_f64().unwrap_or(0.0);
     let net_profit_q2 = stock["net_profit_q2"].as_f64().unwrap_or(0.0);
@@ -170,14 +196,16 @@ pub fn update_stock(
         "UPDATE stocks SET name=?2, symbol=?3, market=?4, currency=?5,
             current_price=?6, previous_close=?7, shares=?8, cost_price=?9,
             pe=?10, dividend_per_10_shares=?11,
-            total_shares=?12, net_profit_q1=?13, net_profit_q2=?14,
-            net_profit_q3=?15, net_profit_q4=?16, net_assets_parent=?17,
-            note=?18, updated_at=?19
+            total_share=?12, net_profit_ttm=?13, net_assets=?14, roe=?15,
+            total_shares=?16, net_profit_q1=?17, net_profit_q2=?18,
+            net_profit_q3=?19, net_profit_q4=?20, net_assets_parent=?21,
+            note=?22, updated_at=?23
          WHERE id=?1",
         params![
             id, name, symbol, market, currency,
             current_price, previous_close, shares, cost_price, pe,
             dividend_per_10_shares,
+            total_share, net_profit_ttm, net_assets, roe,
             total_shares, net_profit_q1, net_profit_q2, net_profit_q3, net_profit_q4,
             net_assets_parent, note, now
         ],
@@ -188,6 +216,7 @@ pub fn update_stock(
         id, name, symbol, market, currency,
         current_price, previous_close, shares, cost_price, pe,
         dividend_per_10_shares,
+        total_share, net_profit_ttm, net_assets, roe,
         total_shares, net_profit_q1, net_profit_q2, net_profit_q3, net_profit_q4,
         net_assets_parent, note,
         created_at, updated_at: now,
@@ -201,6 +230,244 @@ pub fn delete_stock(state: tauri::State<AppState>, id: String) -> Result<(), Str
     conn.execute("DELETE FROM stocks WHERE id = ?1", params![id])
         .map_err(|e| e.to_string())?;
     Ok(())
+}
+
+#[derive(Debug, Deserialize)]
+struct StockMetrics {
+    #[serde(rename = "ROE")]
+    roe: f64,
+    net_profit_ttm: f64,
+    net_assets: f64,
+    #[serde(rename = "totalShare")]
+    total_share: f64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct RefreshFundamentalsResult {
+    pub updated: usize,
+    pub failed: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct StockPrice {
+    close: f64,
+    prev_close: f64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct RefreshPricesResult {
+    pub updated: usize,
+    pub failed: Vec<String>,
+}
+
+fn to_baostock_code(symbol: &str) -> Result<String, String> {
+    let s = symbol.trim().to_lowercase();
+    if s.starts_with("sh.") || s.starts_with("sz.") {
+        return Ok(s);
+    }
+    if s.len() != 6 || !s.chars().all(|c| c.is_ascii_digit()) {
+        return Err(format!("股票代码无效: {}", symbol));
+    }
+    if s.starts_with('6') || s.starts_with('9') {
+        Ok(format!("sh.{}", s))
+    } else {
+        Ok(format!("sz.{}", s))
+    }
+}
+
+fn bundled_script_path(app: &tauri::AppHandle, script: &str) -> PathBuf {
+    app.path()
+        .resolve(script, BaseDirectory::Resource)
+        .ok()
+        .filter(|path| path.exists())
+        .unwrap_or_else(|| {
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(script)
+        })
+}
+
+fn run_python_stock_function(
+    symbol: &str,
+    script_path: &Path,
+    module_name: &str,
+    function_name: &str,
+) -> Result<String, String> {
+    let code = to_baostock_code(symbol)?;
+    let code_arg = serde_json::to_string(&code).map_err(|e| e.to_string())?;
+    let script_arg =
+        serde_json::to_string(&script_path.to_string_lossy()).map_err(|e| e.to_string())?;
+    let module_arg = serde_json::to_string(module_name).map_err(|e| e.to_string())?;
+    let function_arg = serde_json::to_string(function_name).map_err(|e| e.to_string())?;
+    let py = format!(
+        "import importlib.util, json; spec = importlib.util.spec_from_file_location({module}, {script}); m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m); print(json.dumps(getattr(m, {function})({code}), ensure_ascii=False))",
+        module = module_arg,
+        script = script_arg,
+        function = function_arg,
+        code = code_arg
+    );
+
+    let python_candidates = [
+        "/opt/homebrew/bin/python",
+        "/usr/local/bin/python",
+        "python",
+        "/usr/bin/python",
+    ];
+    let mut output_result = None;
+    let mut last_error = String::new();
+
+    for python in python_candidates {
+        match Command::new(python).arg("-c").arg(&py).output() {
+            Ok(output) => {
+                output_result = Some(output);
+                break;
+            }
+            Err(e) => {
+                last_error = format!("{}: {}", python, e);
+            }
+        }
+    }
+
+    let output = output_result
+        .ok_or_else(|| format!("无法运行 python: {}", last_error))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        return Err(if stderr.is_empty() {
+            format!("Python 脚本执行失败: {}", code)
+        } else {
+            stderr
+        });
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let json_line = stdout
+        .lines()
+        .rev()
+        .map(str::trim)
+        .find(|line| line.starts_with('{') && line.ends_with('}'))
+        .unwrap_or_else(|| stdout.trim());
+    Ok(json_line.to_string())
+}
+
+fn fetch_stock_metrics(symbol: &str, script_path: &Path) -> Result<StockMetrics, String> {
+    let json_line =
+        run_python_stock_function(symbol, script_path, "stock_metrics", "get_stock_metrics")?;
+    serde_json::from_str::<StockMetrics>(&json_line)
+        .map_err(|e| format!("解析基本面 JSON 失败: {}", e))
+}
+
+fn fetch_stock_price(symbol: &str, script_path: &Path) -> Result<StockPrice, String> {
+    let json_line =
+        run_python_stock_function(symbol, script_path, "stock_price", "get_stock_price")?;
+    serde_json::from_str::<StockPrice>(&json_line)
+        .map_err(|e| format!("解析股价 JSON 失败: {}", e))
+}
+
+#[tauri::command]
+pub fn refresh_fundamentals(
+    app: tauri::AppHandle,
+    state: tauri::State<AppState>,
+) -> Result<RefreshFundamentalsResult, String> {
+    let db_path = state.db_path.lock().unwrap().clone();
+    let conn = rusqlite::Connection::open(&db_path).map_err(|e| e.to_string())?;
+    let mut stmt = conn
+        .prepare("SELECT id, name, symbol, market FROM stocks ORDER BY updated_at DESC")
+        .map_err(|e| e.to_string())?;
+    let rows = stmt
+        .query_map([], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+                row.get::<_, String>(3)?,
+            ))
+        })
+        .map_err(|e| e.to_string())?;
+
+    let stocks = rows.collect::<Result<Vec<_>, _>>().map_err(|e| e.to_string())?;
+    let mut updated = 0usize;
+    let mut failed = Vec::new();
+    let script_path = bundled_script_path(&app, STOCK_METRICS_SCRIPT);
+
+    for (id, name, symbol, market) in stocks {
+        if market != "A股" || symbol.trim().is_empty() {
+            continue;
+        }
+
+        match fetch_stock_metrics(&symbol, &script_path) {
+            Ok(metrics) => {
+                let now = Utc::now().to_rfc3339();
+                conn.execute(
+                    "UPDATE stocks
+                     SET roe=?2, net_profit_ttm=?3, net_assets=?4, total_share=?5,
+                         updated_at=?6
+                     WHERE id=?1",
+                    params![
+                        id,
+                        metrics.roe,
+                        metrics.net_profit_ttm,
+                        metrics.net_assets,
+                        metrics.total_share,
+                        now
+                    ],
+                )
+                .map_err(|e| e.to_string())?;
+                updated += 1;
+            }
+            Err(e) => failed.push(format!("{}({}): {}", name, symbol, e)),
+        }
+    }
+
+    Ok(RefreshFundamentalsResult { updated, failed })
+}
+
+#[tauri::command]
+pub fn refresh_prices(
+    app: tauri::AppHandle,
+    state: tauri::State<AppState>,
+) -> Result<RefreshPricesResult, String> {
+    let db_path = state.db_path.lock().unwrap().clone();
+    let conn = rusqlite::Connection::open(&db_path).map_err(|e| e.to_string())?;
+    let mut stmt = conn
+        .prepare("SELECT id, name, symbol, market FROM stocks ORDER BY updated_at DESC")
+        .map_err(|e| e.to_string())?;
+    let rows = stmt
+        .query_map([], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+                row.get::<_, String>(3)?,
+            ))
+        })
+        .map_err(|e| e.to_string())?;
+
+    let stocks = rows.collect::<Result<Vec<_>, _>>().map_err(|e| e.to_string())?;
+    let mut updated = 0usize;
+    let mut failed = Vec::new();
+    let script_path = bundled_script_path(&app, STOCK_PRICE_SCRIPT);
+
+    for (id, name, symbol, market) in stocks {
+        if market != "A股" || symbol.trim().is_empty() {
+            continue;
+        }
+
+        match fetch_stock_price(&symbol, &script_path) {
+            Ok(price) => {
+                let now = Utc::now().to_rfc3339();
+                conn.execute(
+                    "UPDATE stocks
+                     SET current_price=?2, previous_close=?3, updated_at=?4
+                     WHERE id=?1",
+                    params![id, price.close, price.prev_close, now],
+                )
+                .map_err(|e| e.to_string())?;
+                updated += 1;
+            }
+            Err(e) => failed.push(format!("{}({}): {}", name, symbol, e)),
+        }
+    }
+
+    Ok(RefreshPricesResult { updated, failed })
 }
 
 #[tauri::command]

@@ -18,3 +18,21 @@ export async function updateStock(stock: Stock): Promise<Stock> {
 export async function deleteStock(id: string): Promise<void> {
   return await invoke<void>("delete_stock", { id });
 }
+
+export interface RefreshFundamentalsResult {
+  updated: number;
+  failed: string[];
+}
+
+export async function refreshFundamentals(): Promise<RefreshFundamentalsResult> {
+  return await invoke<RefreshFundamentalsResult>("refresh_fundamentals");
+}
+
+export interface RefreshPricesResult {
+  updated: number;
+  failed: string[];
+}
+
+export async function refreshPrices(): Promise<RefreshPricesResult> {
+  return await invoke<RefreshPricesResult>("refresh_prices");
+}

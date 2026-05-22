@@ -88,7 +88,6 @@ export default function StockTable({
         case "dividend_yield_pct": av = a.dividend_yield_pct; bv = b.dividend_yield_pct; break;
         case "dividend_total": av = a.dividend_total; bv = b.dividend_total; break;
         case "company_market_cap": av = a.company_market_cap; bv = b.company_market_cap; break;
-        case "pe_dynamic": av = a.pe_dynamic ?? -Infinity; bv = b.pe_dynamic ?? -Infinity; break;
         case "pe_ttm": av = a.pe_ttm ?? -Infinity; bv = b.pe_ttm ?? -Infinity; break;
         case "pb": av = a.pb ?? -Infinity; bv = b.pb ?? -Infinity; break;
         case "roe": av = a.roe ?? -Infinity; bv = b.roe ?? -Infinity; break;
@@ -178,7 +177,6 @@ export default function StockTable({
                 <Th label="涨跌幅" field="day_change_pct" className="text-right" />
                 <Th label="浮动盈亏" field="profit_loss" className="text-right" />
                 <th className="text-right">盈亏率</th>
-                <Th label="动态PE" field="pe_dynamic" className="text-right" />
                 <Th label="PE_TTM" field="pe_ttm" className="text-right" />
                 <Th label="PB" field="pb" className="text-right" />
                 <Th label="ROE" field="roe" className="text-right" />
@@ -193,7 +191,7 @@ export default function StockTable({
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={24}>
+                  <td colSpan={23}>
                     <div className="empty-state">
                       <div className="empty-state-icon">📋</div>
                       <div className="empty-state-text">
@@ -275,7 +273,7 @@ function StockRow({
       <td className="text-right">
         {formatCurrency(s.market_value, s.currency)}
       </td>
-      {/* 公司总市值 = 股价 × 总股本(亿), 单位: 亿元 */}
+      {/* 公司总市值 = 股价 × 总股本(股), 展示为亿元 */}
       <td className="text-right">
         {s.company_market_cap > 0
           ? formatYi(s.company_market_cap, s.currency)
@@ -297,7 +295,6 @@ function StockRow({
         {s.profit_loss_pct >= 0 ? "+" : ""}
         {formatPercent(s.profit_loss_pct)}
       </td>
-      <td className="text-right">{formatValuation(s.pe_dynamic)}</td>
       <td className="text-right">{formatValuation(s.pe_ttm)}</td>
       <td className="text-right">{formatValuation(s.pb)}</td>
       <td className="text-right">

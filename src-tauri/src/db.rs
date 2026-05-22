@@ -22,6 +22,10 @@ pub fn init_db(db_path: &Path) -> Result<()> {
             cost_price            REAL NOT NULL DEFAULT 0,
             pe                    REAL NOT NULL DEFAULT 0,
             dividend_per_10_shares REAL NOT NULL DEFAULT 0,
+            total_share           REAL NOT NULL DEFAULT 0,
+            net_profit_ttm        REAL NOT NULL DEFAULT 0,
+            net_assets            REAL NOT NULL DEFAULT 0,
+            roe                   REAL NOT NULL DEFAULT 0,
             note                  TEXT NOT NULL DEFAULT '',
             created_at            TEXT NOT NULL,
             updated_at            TEXT NOT NULL
@@ -74,6 +78,18 @@ pub fn init_db(db_path: &Path) -> Result<()> {
         "ALTER TABLE stocks ADD COLUMN dividend_per_10_shares REAL NOT NULL DEFAULT 0;",
     );
     let _ = conn.execute_batch(
+        "ALTER TABLE stocks ADD COLUMN total_share REAL NOT NULL DEFAULT 0;",
+    );
+    let _ = conn.execute_batch(
+        "ALTER TABLE stocks ADD COLUMN net_profit_ttm REAL NOT NULL DEFAULT 0;",
+    );
+    let _ = conn.execute_batch(
+        "ALTER TABLE stocks ADD COLUMN net_assets REAL NOT NULL DEFAULT 0;",
+    );
+    let _ = conn.execute_batch(
+        "ALTER TABLE stocks ADD COLUMN roe REAL NOT NULL DEFAULT 0;",
+    );
+    let _ = conn.execute_batch(
         "ALTER TABLE stocks ADD COLUMN total_shares REAL NOT NULL DEFAULT 0;",
     );
     let _ = conn.execute_batch(
@@ -90,6 +106,26 @@ pub fn init_db(db_path: &Path) -> Result<()> {
     );
     let _ = conn.execute_batch(
         "ALTER TABLE stocks ADD COLUMN net_assets_parent REAL NOT NULL DEFAULT 0;",
+    );
+    let _ = conn.execute_batch(
+        "UPDATE stocks
+         SET total_share = CASE
+             WHEN total_share = 0 AND total_shares > 0 THEN total_shares * 100000000
+             ELSE total_share
+         END,
+         net_profit_ttm = CASE
+             WHEN net_profit_ttm = 0 THEN net_profit_q1 + net_profit_q2 + net_profit_q3 + net_profit_q4
+             ELSE net_profit_ttm
+         END,
+         net_assets = CASE
+             WHEN net_assets = 0 AND net_assets_parent > 0 THEN net_assets_parent
+             ELSE net_assets
+         END,
+         roe = CASE
+             WHEN roe = 0 AND net_assets_parent > 0 THEN
+                 (net_profit_q1 + net_profit_q2 + net_profit_q3 + net_profit_q4) / net_assets_parent
+             ELSE roe
+         END;",
     );
 
     let _ = conn.execute_batch(

@@ -39,6 +39,8 @@ pub fn run() {
             commands::create_stock,
             commands::update_stock,
             commands::delete_stock,
+            commands::refresh_fundamentals,
+            commands::refresh_prices,
             commands::list_operation_records,
             commands::create_operation_record,
             commands::delete_operation_record,

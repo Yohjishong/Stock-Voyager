@@ -26,34 +26,18 @@ export function calcStock(stock: Stock): StockWithCalc {
   const dividend_yield_pct =
     market_value > 0 ? dividend_total / market_value : 0;
 
-  // 公司总市值 = 股价 × 公司总股本 (非持仓数量)
-  const company_market_cap = stock.current_price * (stock.total_shares ?? 0);
+  const company_market_cap = stock.current_price * (stock.total_share ?? 0);
 
-  const latestQuarterProfit = stock.net_profit_q1 ?? 0;
-
-  const ttmProfit =
-    (stock.net_profit_q1 ?? 0) +
-    (stock.net_profit_q2 ?? 0) +
-    (stock.net_profit_q3 ?? 0) +
-    (stock.net_profit_q4 ?? 0);
-
-  const pe_dynamic =
-    latestQuarterProfit > 0
-      ? company_market_cap / latestQuarterProfit
-      : null;
+  const netProfitTtm = stock.net_profit_ttm ?? 0;
+  const netAssets = stock.net_assets ?? 0;
 
   const pe_ttm =
-    ttmProfit > 0
-      ? company_market_cap / ttmProfit
+    netProfitTtm > 0
+      ? company_market_cap / netProfitTtm
       : null;
 
-  const net_assets = stock.net_assets_parent ?? 0;
-
   const pb =
-    net_assets > 0 ? company_market_cap / net_assets : null;
-
-  const roe =
-    net_assets > 0 ? ttmProfit / net_assets : null;
+    netAssets > 0 ? company_market_cap / netAssets : null;
 
   return {
     ...stock,
@@ -65,10 +49,8 @@ export function calcStock(stock: Stock): StockWithCalc {
     dividend_total,
     dividend_yield_pct,
     company_market_cap,
-    pe_dynamic,
     pe_ttm,
     pb,
-    roe,
   };
 }
 

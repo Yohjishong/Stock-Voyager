@@ -11,6 +11,7 @@ fn load_stocks_from_db(db_path: &std::path::Path) -> Result<Vec<Stock>, String> 
         .prepare(
             "SELECT id, name, symbol, market, currency, current_price, previous_close,
                     shares, cost_price, pe, dividend_per_10_shares,
+                    total_share, net_profit_ttm, net_assets, roe,
                     total_shares, net_profit_q1, net_profit_q2, net_profit_q3, net_profit_q4,
                     net_assets_parent, note, created_at, updated_at
              FROM stocks",
@@ -31,15 +32,19 @@ fn load_stocks_from_db(db_path: &std::path::Path) -> Result<Vec<Stock>, String> 
                 cost_price: row.get(8)?,
                 pe: row.get(9)?,
                 dividend_per_10_shares: row.get(10)?,
-                total_shares: row.get(11)?,
-                net_profit_q1: row.get(12)?,
-                net_profit_q2: row.get(13)?,
-                net_profit_q3: row.get(14)?,
-                net_profit_q4: row.get(15)?,
-                net_assets_parent: row.get(16)?,
-                note: row.get(17)?,
-                created_at: row.get(18)?,
-                updated_at: row.get(19)?,
+                total_share: row.get(11)?,
+                net_profit_ttm: row.get(12)?,
+                net_assets: row.get(13)?,
+                roe: row.get(14)?,
+                total_shares: row.get(15)?,
+                net_profit_q1: row.get(16)?,
+                net_profit_q2: row.get(17)?,
+                net_profit_q3: row.get(18)?,
+                net_profit_q4: row.get(19)?,
+                net_assets_parent: row.get(20)?,
+                note: row.get(21)?,
+                created_at: row.get(22)?,
+                updated_at: row.get(23)?,
             })
         })
         .map_err(|e| e.to_string())?;
@@ -58,6 +63,7 @@ pub fn export_stocks_csv(state: tauri::State<AppState>, path: String) -> Result<
         "id", "name", "symbol", "market", "currency",
         "current_price", "previous_close", "shares", "cost_price",
         "pe", "dividend_per_10_shares",
+        "total_share", "net_profit_ttm", "net_assets", "roe",
         "total_shares", "net_profit_q1", "net_profit_q2", "net_profit_q3", "net_profit_q4",
         "net_assets_parent", "note", "created_at", "updated_at",
     ])
@@ -76,6 +82,10 @@ pub fn export_stocks_csv(state: tauri::State<AppState>, path: String) -> Result<
             &s.cost_price.to_string(),
             &s.pe.to_string(),
             &s.dividend_per_10_shares.to_string(),
+            &s.total_share.to_string(),
+            &s.net_profit_ttm.to_string(),
+            &s.net_assets.to_string(),
+            &s.roe.to_string(),
             &s.total_shares.to_string(),
             &s.net_profit_q1.to_string(),
             &s.net_profit_q2.to_string(),
@@ -134,9 +144,10 @@ pub fn import_stocks_json(
             "INSERT OR IGNORE INTO stocks
                 (id, name, symbol, market, currency, current_price, previous_close,
                  shares, cost_price, pe, dividend_per_10_shares,
+                 total_share, net_profit_ttm, net_assets, roe,
                  total_shares, net_profit_q1, net_profit_q2, net_profit_q3, net_profit_q4,
                  net_assets_parent, note, created_at, updated_at)
-             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20)",
+             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24)",
             params![
                 id,
                 name,
@@ -149,6 +160,10 @@ pub fn import_stocks_json(
                 s["cost_price"].as_f64().unwrap_or(0.0),
                 s["pe"].as_f64().unwrap_or(0.0),
                 s["dividend_per_10_shares"].as_f64().unwrap_or(0.0),
+                s["total_share"].as_f64().unwrap_or(0.0),
+                s["net_profit_ttm"].as_f64().unwrap_or(0.0),
+                s["net_assets"].as_f64().unwrap_or(0.0),
+                s["roe"].as_f64().unwrap_or(0.0),
                 s["total_shares"].as_f64().unwrap_or(0.0),
                 s["net_profit_q1"].as_f64().unwrap_or(0.0),
                 s["net_profit_q2"].as_f64().unwrap_or(0.0),
@@ -211,6 +226,10 @@ pub fn import_stocks_csv(
         let cost_price = get("cost_price").parse::<f64>().unwrap_or(0.0);
         let pe = get("pe").parse::<f64>().unwrap_or(0.0);
         let dividend_per_10_shares = get("dividend_per_10_shares").parse::<f64>().unwrap_or(0.0);
+        let total_share = get("total_share").parse::<f64>().unwrap_or(0.0);
+        let net_profit_ttm = get("net_profit_ttm").parse::<f64>().unwrap_or(0.0);
+        let net_assets = get("net_assets").parse::<f64>().unwrap_or(0.0);
+        let roe = get("roe").parse::<f64>().unwrap_or(0.0);
         let total_shares = get("total_shares").parse::<f64>().unwrap_or(0.0);
         let net_profit_q1 = get("net_profit_q1").parse::<f64>().unwrap_or(0.0);
         let net_profit_q2 = get("net_profit_q2").parse::<f64>().unwrap_or(0.0);
@@ -222,13 +241,15 @@ pub fn import_stocks_csv(
             "INSERT OR IGNORE INTO stocks
                 (id, name, symbol, market, currency, current_price, previous_close,
                  shares, cost_price, pe, dividend_per_10_shares,
+                 total_share, net_profit_ttm, net_assets, roe,
                  total_shares, net_profit_q1, net_profit_q2, net_profit_q3, net_profit_q4,
                  net_assets_parent, note, created_at, updated_at)
-             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20)",
+             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24)",
             params![
                 id, name, symbol, market, currency,
                 current_price, previous_close, shares, cost_price, pe,
                 dividend_per_10_shares,
+                total_share, net_profit_ttm, net_assets, roe,
                 total_shares, net_profit_q1, net_profit_q2, net_profit_q3, net_profit_q4,
                 net_assets_parent, note, now, now
             ],
