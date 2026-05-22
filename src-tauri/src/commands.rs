@@ -236,11 +236,6 @@ pub fn set_setting(
     Ok(())
 }
 
-#[tauri::command]
-pub fn get_database_path(state: tauri::State<AppState>) -> String {
-    state.db_path.lock().unwrap().to_string_lossy().to_string()
-}
-
 // ----- 操作记录 -----
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

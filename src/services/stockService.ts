@@ -18,7 +18,3 @@ export async function updateStock(stock: Stock): Promise<Stock> {
 export async function deleteStock(id: string): Promise<void> {
   return await invoke<void>("delete_stock", { id });
 }
-
-export async function getDatabasePath(): Promise<string> {
-  return await invoke<string>("get_database_path");
-}

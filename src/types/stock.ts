@@ -33,8 +33,6 @@ export interface StockWithCalc extends Stock {
   dividend_total: number;                      // 去年分红总额
   dividend_yield_pct: number;                  // 静态股息率
   company_market_cap: number;                  // 公司总市值 = 股价 × 总股本
-  latest_quarter_net_profit_parent: number;    // 最近单季归母净利润 = net_profit_q1
-  ttm_net_profit_parent: number;               // TTM 归母净利润 = 四季度之和
   pe_dynamic: number | null;                   // 动态 PE = 总市值 / 最近单季净利润
   pe_ttm: number | null;                       // PE_TTM = 总市值 / TTM 净利润
   pb: number | null;                           // PB = 总市值 / 归母净资产

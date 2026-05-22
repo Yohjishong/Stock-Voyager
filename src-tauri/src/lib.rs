@@ -50,7 +50,6 @@ pub fn run() {
             commands::delete_stock_note,
             commands::get_setting,
             commands::set_setting,
-            commands::get_database_path,
             import_export::export_stocks_csv,
             import_export::export_stocks_json,
             import_export::backup_database,

@@ -32,17 +32,6 @@ pub fn init_db(db_path: &Path) -> Result<()> {
             value TEXT NOT NULL DEFAULT ''
         );
 
-        CREATE TABLE IF NOT EXISTS snapshots (
-            id            TEXT PRIMARY KEY,
-            stock_id      TEXT NOT NULL,
-            date          TEXT NOT NULL,
-            current_price REAL NOT NULL DEFAULT 0,
-            shares        REAL NOT NULL DEFAULT 0,
-            market_value  REAL NOT NULL DEFAULT 0,
-            created_at    TEXT NOT NULL,
-            FOREIGN KEY (stock_id) REFERENCES stocks(id) ON DELETE CASCADE
-        );
-
         CREATE TABLE IF NOT EXISTS operation_records (
             id                      TEXT PRIMARY KEY,
             stock_id                TEXT NOT NULL,
