@@ -2,7 +2,11 @@ import { useState, useEffect, useCallback } from "react";
 import {
   RefreshCw,
   Plus,
-  ArrowDownUp,
+  BarChart2,
+  Settings,
+  Database,
+  Bot,
+  FileSearch,
 } from "lucide-react";
 import { Stock, StockWithCalc } from "./types/stock";
 import { calcStock, calcSummary } from "./lib/calculations";
@@ -38,6 +42,8 @@ import ConfirmDialog from "./components/ConfirmDialog";
 import CashBalanceDialog from "./components/CashBalanceDialog";
 import InvestedCapitalControl from "./components/InvestedCapitalControl";
 import StockDetailPage from "./components/StockDetailPage";
+import StockAgentPage from "./components/StockAgentPage";
+import ResearchReportsPage from "./components/ResearchReportsPage";
 
 // ===== Toast =====
 interface ToastItem {
@@ -66,6 +72,8 @@ function useToast() {
   return { toasts, show };
 }
 
+type PageView = "portfolio" | "agent" | "reports";
+
 // ===== App =====
 export default function App() {
   const { toasts, show } = useToast();
@@ -76,9 +84,11 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
 
+  const [page, setPage] = useState<PageView>("portfolio");
+
   // Modals
   const [showForm, setShowForm] = useState(false);
-  const [editStock, setEditStock] = useState<Stock | null>(null);
+  const [editStock, setEditStock] = useState<StockWithCalc | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<StockWithCalc | null>(null);
   const [showIE, setShowIE] = useState(false);
   const [showCashDialog, setShowCashDialog] = useState(false);
@@ -234,6 +244,8 @@ export default function App() {
     try {
       const updated = await updateStock({
         ...stock,
+        pe_ttm: stock.pe_ttm ?? 0,
+        pb: stock.pb ?? 0,
         shares: payload.newShares,
         cost_price: payload.newCostPrice,
         updated_at: "",
@@ -304,12 +316,76 @@ export default function App() {
     }
   }
 
+  const isDetail = page === "portfolio" && !!detailStock;
+
+  function navigateTo(p: PageView) {
+    setPage(p);
+    if (p !== "portfolio") setSelectedStockId(null);
+  }
+
+  const topbarTitle = page === "agent"
+    ? "Stock Agent"
+    : page === "reports"
+    ? "调研报告"
+    : isDetail
+    ? detailStock!.name
+    : "股票池";
+
   return (
     <div className="app-layout">
-      {/* Navbar */}
-      <nav className="navbar">
-        <span className="navbar-brand">Stock Voyager</span>
-        <div className="navbar-actions">
+      {/* Sidebar */}
+      <aside className="sidebar">
+        <div className="sidebar-brand">
+          <div className="sidebar-brand-icon">SV</div>
+          <div className="sidebar-brand-text">
+            <span className="sidebar-brand-name">Stock Voyager</span>
+            <span className="sidebar-brand-sub">Portfolio Console</span>
+          </div>
+        </div>
+
+        <nav className="sidebar-nav">
+          <span className="sidebar-section-label">主要功能</span>
+          <button
+            className={`sidebar-nav-item ${page === "portfolio" ? "active" : ""}`}
+            onClick={() => navigateTo("portfolio")}
+          >
+            <BarChart2 size={15} />
+            <span>股票池</span>
+          </button>
+          <button
+            className={`sidebar-nav-item ${page === "agent" ? "active" : ""}`}
+            onClick={() => navigateTo("agent")}
+          >
+            <Bot size={15} />
+            <span>Stock Agent</span>
+          </button>
+          <button
+            className={`sidebar-nav-item ${page === "reports" ? "active" : ""}`}
+            onClick={() => navigateTo("reports")}
+          >
+            <FileSearch size={15} />
+            <span>调研报告</span>
+          </button>
+          <button
+            className="sidebar-nav-item"
+            onClick={() => setShowIE(true)}
+          >
+            <Database size={15} />
+            <span>导入导出</span>
+          </button>
+
+          <div className="sidebar-divider" />
+          <span className="sidebar-section-label">账户</span>
+          <button
+            className="sidebar-nav-item"
+            onClick={() => setShowCashDialog(true)}
+          >
+            <Settings size={15} />
+            <span>资产设置</span>
+          </button>
+        </nav>
+
+        <div className="sidebar-bottom">
           <InvestedCapitalControl
             investedCapital={investedCapital}
             disabled={loading || actionLoading}
@@ -317,65 +393,80 @@ export default function App() {
             onRecharge={handleRecharge}
             onWithdraw={handleWithdraw}
           />
-          <button
-            className="btn btn-ghost"
-            onClick={handleFundamentalsRefresh}
-            disabled={loading || actionLoading}
-            title="刷新 ROE / TTM 净利润 / 净资产 / 总股本"
-          >
-            <RefreshCw size={14} className={actionLoading ? "spin" : ""} />
-            基本面刷新
-          </button>
-          <button
-            className="btn btn-ghost"
-            onClick={handlePriceRefresh}
-            disabled={loading || actionLoading}
-            title="刷新当前股价和上一交易日收盘价"
-          >
-            <RefreshCw size={14} className={actionLoading ? "spin" : ""} />
-            股价刷新
-          </button>
-          <button className="btn btn-primary" onClick={openCreate}>
-            <Plus size={14} />
-            新增股票
-          </button>
-          <button
-            className="btn btn-ghost"
-            onClick={() => setShowIE(true)}
-          >
-            <ArrowDownUp size={14} />
-            导入/导出
-          </button>
         </div>
-      </nav>
+      </aside>
 
-      {/* Main */}
-      <main className="main-content">
-        {detailStock ? (
-          <StockDetailPage
-            stock={detailStock}
-            onBack={() => setSelectedStockId(null)}
-            onToast={show}
-            onStocksNeedReload={loadData}
-          />
-        ) : (
-          <>
-            <SummaryCards
-              stats={stats}
-              totalCount={stocks.length}
-              onTotalAssetsClick={() => setShowCashDialog(true)}
-            />
-            <StockTable
-              stocks={stocksWithCalc}
-              onEdit={openEdit}
-              onDelete={openDelete}
-              onOpenDetail={(s) => setSelectedStockId(s.id)}
-              onTradeConfirm={(stock, payload) => handleTradeConfirm(stock, payload)}
-              tradeLoading={actionLoading}
-            />
-          </>
-        )}
-      </main>
+      {/* Content */}
+      <div className="app-content">
+        {/* Top bar */}
+        <header className="topbar">
+          <span className="topbar-title">{topbarTitle}</span>
+          <div className="topbar-actions">
+            {page === "portfolio" && !isDetail && (
+              <>
+                <button
+                  className="btn btn-ghost"
+                  style={{ minWidth: 80 }}
+                  onClick={handlePriceRefresh}
+                  disabled={loading || actionLoading}
+                  title="刷新股价"
+                >
+                  <RefreshCw size={13} className={actionLoading ? "spin" : ""} />
+                  <span>股价</span>
+                </button>
+                <button
+                  className="btn btn-ghost"
+                  style={{ minWidth: 88 }}
+                  onClick={handleFundamentalsRefresh}
+                  disabled={loading || actionLoading}
+                  title="刷新基本面"
+                >
+                  <RefreshCw size={13} className={actionLoading ? "spin" : ""} />
+                  <span>基本面</span>
+                </button>
+                <button className="btn btn-primary" style={{ minWidth: 84 }} onClick={openCreate}>
+                  <Plus size={13} />
+                  新增股票
+                </button>
+              </>
+            )}
+          </div>
+        </header>
+
+        {/* Main */}
+        <main className="main-content">
+          {page === "agent" && <StockAgentPage stocks={stocksWithCalc} stats={stats} />}
+
+          {page === "reports" && <ResearchReportsPage onToast={show} />}
+
+          {page === "portfolio" && (
+            detailStock ? (
+              <StockDetailPage
+                stock={detailStock}
+                onBack={() => setSelectedStockId(null)}
+                onToast={show}
+                onStocksNeedReload={loadData}
+              />
+            ) : (
+              <>
+                <SummaryCards
+                  stats={stats}
+                  totalCount={stocks.length}
+                  onTotalAssetsClick={() => setShowCashDialog(true)}
+                />
+                <StockTable
+                  stocks={stocksWithCalc}
+                  onEdit={openEdit}
+                  onDelete={openDelete}
+                  onOpenDetail={(s) => setSelectedStockId(s.id)}
+                  onTradeConfirm={(stock, payload) => handleTradeConfirm(stock, payload)}
+                  tradeLoading={actionLoading}
+                />
+              </>
+            )
+          )}
+        </main>
+      </div>
 
       {/* 新增/编辑表单 */}
       {showForm && (

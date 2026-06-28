@@ -31,13 +31,20 @@ export function calcStock(stock: Stock): StockWithCalc {
   const netProfitTtm = stock.net_profit_ttm ?? 0;
   const netAssets = stock.net_assets ?? 0;
 
-  const pe_ttm =
-    netProfitTtm > 0
-      ? company_market_cap / netProfitTtm
-      : null;
+  // 优先使用 baostock 直接获取的 PE_TTM/PB，回退到自计算
+  const pe_ttm: number | null =
+    (stock.pe_ttm ?? 0) > 0
+      ? stock.pe_ttm
+      : netProfitTtm > 0
+        ? company_market_cap / netProfitTtm
+        : null;
 
-  const pb =
-    netAssets > 0 ? company_market_cap / netAssets : null;
+  const pb: number | null =
+    (stock.pb ?? 0) > 0
+      ? stock.pb
+      : netAssets > 0
+        ? company_market_cap / netAssets
+        : null;
 
   return {
     ...stock,

@@ -58,6 +58,19 @@ pub fn run() {
             import_export::import_stocks_json,
             import_export::import_stocks_csv,
             import_export::restore_database,
+            commands::list_research_reports,
+            commands::create_research_report,
+            commands::update_research_report,
+            commands::delete_research_report,
+            commands::list_agent_conversations,
+            commands::create_agent_conversation,
+            commands::update_agent_conversation_title,
+            commands::delete_agent_conversation,
+            commands::list_agent_messages,
+            commands::append_agent_message,
+            commands::chat_completion,
+            commands::refresh_kline,
+            commands::get_kline_data,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

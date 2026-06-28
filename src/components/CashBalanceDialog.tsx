@@ -62,10 +62,10 @@ export default function CashBalanceDialog({
             </div>
           </div>
           <div className="modal-footer">
-            <button type="button" className="btn btn-outline" onClick={onClose}>
+            <button type="button" className="btn btn-outline" style={{ minWidth: 72 }} onClick={onClose}>
               取消
             </button>
-            <button type="submit" className="btn btn-primary" disabled={saving}>
+            <button type="submit" className="btn btn-primary" style={{ minWidth: 88 }} disabled={saving}>
               {saving ? "保存中…" : "保存"}
             </button>
           </div>

@@ -28,18 +28,23 @@ export default function ConfirmDialog({
         <div className="modal-header">
           <span className="modal-title">{title}</span>
           <button className="modal-close" onClick={onCancel}>
-            <X size={16} />
+            <X size={15} />
           </button>
         </div>
         <div className="modal-body">
           <p className="confirm-message">{message}</p>
         </div>
         <div className="modal-footer">
-          <button className="btn btn-outline" onClick={onCancel}>
+          <button
+            className="btn btn-outline"
+            style={{ minWidth: 72 }}
+            onClick={onCancel}
+          >
             {cancelLabel}
           </button>
           <button
             className={`btn ${danger ? "btn-danger" : "btn-primary"}`}
+            style={{ minWidth: 88 }}
             onClick={onConfirm}
           >
             {confirmLabel}

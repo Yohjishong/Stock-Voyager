@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { X } from "lucide-react";
-import { Stock, StockFormData, MarketType, CurrencyType } from "../types/stock";
+import { Stock, StockWithCalc, StockFormData, MarketType, CurrencyType } from "../types/stock";
 import { validateStockForm, ValidationError } from "../lib/validators";
 import {
   lookupBySymbol,
@@ -24,7 +24,7 @@ const DEFAULT_FORM: StockFormData = {
   note: "",
 };
 
-function stockToForm(stock: Stock): StockFormData {
+function stockToForm(stock: Stock | StockWithCalc): StockFormData {
   return {
     name: stock.name,
     symbol: stock.symbol || "",
@@ -43,7 +43,7 @@ function stockToForm(stock: Stock): StockFormData {
 }
 
 interface Props {
-  stock?: Stock | null;
+  stock?: Stock | StockWithCalc | null;
   onSave: (data: Omit<Stock, "id" | "created_at" | "updated_at">) => Promise<void>;
   onClose: () => void;
   saving?: boolean;
@@ -136,6 +136,8 @@ export default function StockForm({ stock, onSave, onClose, saving }: Props) {
       net_profit_q3: stock?.net_profit_q3 ?? 0,
       net_profit_q4: stock?.net_profit_q4 ?? 0,
       net_assets_parent: stock?.net_assets_parent ?? 0,
+      pe_ttm: stock?.pe_ttm ?? 0,
+      pb: stock?.pb ?? 0,
       note: form.note.trim(),
     };
 
@@ -350,13 +352,14 @@ export default function StockForm({ stock, onSave, onClose, saving }: Props) {
             <button
               type="button"
               className="btn btn-outline"
+              style={{ minWidth: 72 }}
               onClick={onClose}
               disabled={saving}
             >
               取消
             </button>
-            <button type="submit" className="btn btn-primary" disabled={saving}>
-              {saving ? "保存中..." : "保存"}
+            <button type="submit" className="btn btn-primary" style={{ minWidth: 88 }} disabled={saving}>
+              {saving ? "保存中…" : "保存"}
             </button>
           </div>
         </form>

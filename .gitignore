@@ -4,6 +4,7 @@ dist/
 dist-ssr/
 
 llm.md
+CLAUDE.md
 # Rust / Tauri build artifacts
 src-tauri/target/
 
