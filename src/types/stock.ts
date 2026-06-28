@@ -17,6 +17,8 @@ export interface Stock {
   net_profit_ttm: number;          // TTM 归母净利润 (元)
   net_assets: number;              // 归母净资产 (元)
   roe: number;                     // ROE, 小数
+  pe_ttm: number;                  // PE_TTM (baostock 直接获取, 0 表示未刷新)
+  pb: number;                      // PB (baostock 直接获取, 0 表示未刷新)
   total_shares: number;            // 旧字段, 保留兼容旧数据库/导入文件
   net_profit_q1: number;           // 最近第 1 个季度归母净利润 (单季度)
   net_profit_q2: number;           // 最近第 2 个季度归母净利润 (单季度)
@@ -28,7 +30,7 @@ export interface Stock {
   updated_at: string;
 }
 
-export interface StockWithCalc extends Stock {
+export interface StockWithCalc extends Omit<Stock, "pe_ttm" | "pb"> {
   market_value: number;                        // 持仓市值 = 股价 × 持仓数量
   day_change_value: number;                    // 当日涨跌市值
   day_change_pct: number;                      // 当日涨跌幅

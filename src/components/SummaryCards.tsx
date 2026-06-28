@@ -7,7 +7,6 @@ interface CardProps {
   value: string;
   valueColor?: string;
   subValue?: ReactNode;
-  /** 可点击 (例如总资产调现金) */
   onClick?: () => void;
 }
 
@@ -21,11 +20,9 @@ function Card({ label, value, valueColor, subValue, onClick }: CardProps) {
       >
         {value}
       </div>
-      {subValue != null ? (
-        <div style={{ fontSize: 11, color: "var(--color-text-muted)", marginTop: 2 }}>
-          {subValue}
-        </div>
-      ) : null}
+      {subValue != null && (
+        <div className="summary-card-sub">{subValue}</div>
+      )}
     </>
   );
 
@@ -40,7 +37,6 @@ function Card({ label, value, valueColor, subValue, onClick }: CardProps) {
       </button>
     );
   }
-
   return <div className="summary-card">{inner}</div>;
 }
 
@@ -50,11 +46,7 @@ interface Props {
   onTotalAssetsClick: () => void;
 }
 
-export default function SummaryCards({
-  stats,
-  totalCount,
-  onTotalAssetsClick,
-}: Props) {
+export default function SummaryCards({ stats, totalCount, onTotalAssetsClick }: Props) {
   const {
     total_market_value,
     total_day_change,
@@ -91,7 +83,7 @@ export default function SummaryCards({
       <Card
         label="总资产"
         value={`¥${formatNumber(total_assets)}`}
-        subValue={`${totalCount} 只股票 · 现金 ¥${formatNumber(cash)} · 点击调整现金`}
+        subValue={`${totalCount} 只 · 现金 ¥${formatNumber(cash)}`}
         onClick={onTotalAssetsClick}
       />
       <Card
@@ -120,18 +112,9 @@ export default function SummaryCards({
         label="静态股息"
         value={`¥${formatNumber(total_dividend)}`}
         subValue={
-          <>
-            <div
-              style={{
-                fontWeight: 600,
-                color: "var(--color-text)",
-                marginBottom: 4,
-              }}
-            >
-              分红总收入 (税后到账累计) ¥{formatNumber(total_dividend_received)}
-            </div>
-            <div>去年名目股息对应整体 股息率 {formatPercent(overallDividendYield)}</div>
-          </>
+          <span>
+            到账 ¥{formatNumber(total_dividend_received)} · 股息率 {formatPercent(overallDividendYield)}
+          </span>
         }
       />
     </div>

@@ -37,6 +37,7 @@ import {
   changeColor,
 } from "../lib/format";
 import ConfirmDialog from "./ConfirmDialog";
+import KLineChart from "./KLineChart";
 
 const OP_TYPE_LABEL: Record<OperationType, string> = {
   add: "加仓",
@@ -186,6 +187,10 @@ export default function StockDetailPage({
         </div>
       </div>
 
+      <div className="detail-kline-section">
+        <KLineChart stockId={stock.id} market={stock.market} />
+      </div>
+
       <div className="detail-tab-section">
         <div className="detail-tab-bar">
           <div className="trade-mode-tabs detail-inner-tabs">
@@ -226,13 +231,57 @@ export default function StockDetailPage({
           <div className="table-panel detail-records-panel">
             <div className="table-wrapper">
               {loadingRecords ? (
-                <div className="empty-state" style={{ padding: 40 }}>
-                  加载中…
-                </div>
+                <table className="stock-table detail-op-table">
+                  <thead>
+                    <tr>
+                      <th>日期</th><th>类型</th>
+                      <th className="text-right">数量变化</th>
+                      <th className="text-right">价格</th>
+                      <th className="text-right">现金影响</th>
+                      <th className="text-right">操作前持仓</th>
+                      <th className="text-right">操作后持仓</th>
+                      <th className="text-right">操作前成本</th>
+                      <th className="text-right">操作后成本</th>
+                      <th>备注</th><th className="text-center">操作</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[1, 2, 3].map((i) => (
+                      <tr key={i}>
+                        {Array.from({ length: 11 }).map((_, j) => (
+                          <td key={j}><div className="skeleton skeleton-text" style={{ width: j === 0 ? 80 : j === 10 ? 28 : 60 }} /></td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               ) : records.length === 0 ? (
-                <div className="empty-state" style={{ padding: 40 }}>
-                  <div className="empty-state-text">暂无操作记录</div>
-                </div>
+                <table className="stock-table detail-op-table">
+                  <thead>
+                    <tr>
+                      <th>日期</th><th>类型</th>
+                      <th className="text-right">数量变化</th>
+                      <th className="text-right">价格</th>
+                      <th className="text-right">现金影响</th>
+                      <th className="text-right">操作前持仓</th>
+                      <th className="text-right">操作后持仓</th>
+                      <th className="text-right">操作前成本</th>
+                      <th className="text-right">操作后成本</th>
+                      <th>备注</th><th className="text-center">操作</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td colSpan={11} style={{ padding: 0, border: "none" }}>
+                        <div className="empty-state">
+                          <div className="empty-state-icon">📝</div>
+                          <div className="empty-state-title">暂无操作记录</div>
+                          <div className="empty-state-text">点击「新增记录」添加分红除权或手动记录</div>
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
               ) : (
                 <table className="stock-table detail-op-table">
                   <thead>
@@ -308,12 +357,25 @@ export default function StockDetailPage({
         {tab === "notes" && (
           <div className="detail-notes-list">
             {loadingNotes ? (
-              <div className="empty-state" style={{ padding: 40 }}>
-                加载中…
-              </div>
+              <>
+                {[1, 2].map((i) => (
+                  <div key={i} className="table-panel note-card">
+                    <div className="note-card-header">
+                      <div style={{ flex: 1 }}>
+                        <div className="skeleton skeleton-text" style={{ width: 140, marginBottom: 6 }} />
+                        <div className="skeleton skeleton-text" style={{ width: 90 }} />
+                      </div>
+                    </div>
+                    <div className="skeleton skeleton-text" style={{ marginTop: 10 }} />
+                    <div className="skeleton skeleton-text" style={{ width: "80%", marginTop: 6 }} />
+                  </div>
+                ))}
+              </>
             ) : notes.length === 0 ? (
-              <div className="empty-state" style={{ padding: 40 }}>
-                <div className="empty-state-text">暂无分析笔记</div>
+              <div className="empty-state" style={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)" }}>
+                <div className="empty-state-icon">💡</div>
+                <div className="empty-state-title">暂无分析笔记</div>
+                <div className="empty-state-text">点击「新增笔记」记录对该股票的分析与观察</div>
               </div>
             ) : (
               notes.map((n) => (
@@ -779,10 +841,10 @@ function AddOperationRecordModal({
             )}
           </div>
           <div className="modal-footer">
-            <button type="button" className="btn btn-outline" onClick={onClose} disabled={saving}>
+            <button type="button" className="btn btn-outline" style={{ minWidth: 72 }} onClick={onClose} disabled={saving}>
               取消
             </button>
-            <button type="submit" className="btn btn-primary" disabled={saving || !formOk}>
+            <button type="submit" className="btn btn-primary" style={{ minWidth: 88 }} disabled={saving || !formOk}>
               {saving ? "保存中…" : "保存"}
             </button>
           </div>
@@ -852,10 +914,10 @@ function StockNoteModal({
             </div>
           </div>
           <div className="modal-footer">
-            <button type="button" className="btn btn-outline" onClick={onClose} disabled={saving}>
+            <button type="button" className="btn btn-outline" style={{ minWidth: 72 }} onClick={onClose} disabled={saving}>
               取消
             </button>
-            <button type="submit" className="btn btn-primary" disabled={saving}>
+            <button type="submit" className="btn btn-primary" style={{ minWidth: 88 }} disabled={saving}>
               {saving ? "保存中…" : "保存"}
             </button>
           </div>

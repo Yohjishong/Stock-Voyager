@@ -70,6 +70,47 @@ pub fn init_db(db_path: &Path) -> Result<()> {
             created_at  TEXT NOT NULL,
             updated_at  TEXT NOT NULL,
             FOREIGN KEY (stock_id) REFERENCES stocks(id) ON DELETE CASCADE
+        );
+
+        CREATE TABLE IF NOT EXISTS research_reports (
+            id              TEXT PRIMARY KEY,
+            title           TEXT NOT NULL DEFAULT '',
+            summary         TEXT NOT NULL DEFAULT '',
+            content         TEXT NOT NULL DEFAULT '',
+            stock_symbols   TEXT NOT NULL DEFAULT '',
+            tags            TEXT NOT NULL DEFAULT '',
+            created_at      TEXT NOT NULL,
+            updated_at      TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS agent_conversations (
+            id          TEXT PRIMARY KEY,
+            title       TEXT NOT NULL DEFAULT '新对话',
+            created_at  TEXT NOT NULL,
+            updated_at  TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS agent_messages (
+            id              TEXT PRIMARY KEY,
+            conversation_id TEXT NOT NULL,
+            role            TEXT NOT NULL,
+            content         TEXT NOT NULL DEFAULT '',
+            created_at      TEXT NOT NULL,
+            FOREIGN KEY (conversation_id) REFERENCES agent_conversations(id) ON DELETE CASCADE
+        );
+
+        CREATE TABLE IF NOT EXISTS kline_data (
+            id          TEXT PRIMARY KEY,
+            stock_id    TEXT NOT NULL,
+            date        TEXT NOT NULL,
+            period      TEXT NOT NULL DEFAULT 'd',
+            open        REAL NOT NULL DEFAULT 0,
+            high        REAL NOT NULL DEFAULT 0,
+            low         REAL NOT NULL DEFAULT 0,
+            close       REAL NOT NULL DEFAULT 0,
+            volume      REAL NOT NULL DEFAULT 0,
+            UNIQUE(stock_id, period, date),
+            FOREIGN KEY (stock_id) REFERENCES stocks(id) ON DELETE CASCADE
         );",
     )?;
 
@@ -108,6 +149,12 @@ pub fn init_db(db_path: &Path) -> Result<()> {
         "ALTER TABLE stocks ADD COLUMN net_assets_parent REAL NOT NULL DEFAULT 0;",
     );
     let _ = conn.execute_batch(
+        "ALTER TABLE stocks ADD COLUMN pe_ttm REAL NOT NULL DEFAULT 0;",
+    );
+    let _ = conn.execute_batch(
+        "ALTER TABLE stocks ADD COLUMN pb REAL NOT NULL DEFAULT 0;",
+    );
+    let _ = conn.execute_batch(
         "UPDATE stocks
          SET total_share = CASE
              WHEN total_share = 0 AND total_shares > 0 THEN total_shares * 100000000
@@ -126,6 +173,60 @@ pub fn init_db(db_path: &Path) -> Result<()> {
                  (net_profit_q1 + net_profit_q2 + net_profit_q3 + net_profit_q4) / net_assets_parent
              ELSE roe
          END;",
+    );
+
+    // 迁移: 创建 kline_data 表 (若不存在)
+    let _ = conn.execute_batch(
+        "CREATE TABLE IF NOT EXISTS kline_data (
+            id          TEXT PRIMARY KEY,
+            stock_id    TEXT NOT NULL,
+            date        TEXT NOT NULL,
+            period      TEXT NOT NULL DEFAULT 'd',
+            open        REAL NOT NULL DEFAULT 0,
+            high        REAL NOT NULL DEFAULT 0,
+            low         REAL NOT NULL DEFAULT 0,
+            close       REAL NOT NULL DEFAULT 0,
+            volume      REAL NOT NULL DEFAULT 0,
+            UNIQUE(stock_id, period, date),
+            FOREIGN KEY (stock_id) REFERENCES stocks(id) ON DELETE CASCADE
+        );",
+    );
+
+    // 迁移: kline_data 加 period 列并重建 UNIQUE 约束
+    // 先检查是否已有 period 列；若无则执行表重建
+    let has_period: bool = conn
+        .query_row(
+            "SELECT COUNT(*) FROM pragma_table_info('kline_data') WHERE name='period'",
+            [],
+            |r| r.get::<_, i64>(0),
+        )
+        .unwrap_or(0)
+        > 0;
+    if !has_period {
+        let _ = conn.execute_batch(
+            "BEGIN;
+             ALTER TABLE kline_data RENAME TO kline_data_old;
+             CREATE TABLE kline_data (
+                 id          TEXT PRIMARY KEY,
+                 stock_id    TEXT NOT NULL,
+                 date        TEXT NOT NULL,
+                 period      TEXT NOT NULL DEFAULT 'd',
+                 open        REAL NOT NULL DEFAULT 0,
+                 high        REAL NOT NULL DEFAULT 0,
+                 low         REAL NOT NULL DEFAULT 0,
+                 close       REAL NOT NULL DEFAULT 0,
+                 volume      REAL NOT NULL DEFAULT 0,
+                 UNIQUE(stock_id, period, date),
+                 FOREIGN KEY (stock_id) REFERENCES stocks(id) ON DELETE CASCADE
+             );
+             INSERT INTO kline_data (id, stock_id, date, period, open, high, low, close, volume)
+                 SELECT id, stock_id, date, 'd', open, high, low, close, volume FROM kline_data_old;
+             DROP TABLE kline_data_old;
+             COMMIT;",
+        );
+    }
+    let _ = conn.execute_batch(
+        "CREATE INDEX IF NOT EXISTS idx_kline_stock_period_date ON kline_data(stock_id, period, date);",
     );
 
     let _ = conn.execute_batch(

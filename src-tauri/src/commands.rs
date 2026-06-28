@@ -9,6 +9,7 @@ use tauri::{path::BaseDirectory, Manager};
 
 const STOCK_METRICS_SCRIPT: &str = "scripts/get_stock_metrics.py";
 const STOCK_PRICE_SCRIPT: &str = "scripts/get_value.py";
+const KLINE_SCRIPT: &str = "scripts/get_kline.py";
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Stock {
@@ -27,6 +28,8 @@ pub struct Stock {
     pub net_profit_ttm: f64,
     pub net_assets: f64,
     pub roe: f64,
+    pub pe_ttm: f64,
+    pub pb: f64,
     pub total_shares: f64,
     pub net_profit_q1: f64,
     pub net_profit_q2: f64,
@@ -55,15 +58,17 @@ fn row_to_stock(row: &rusqlite::Row) -> rusqlite::Result<Stock> {
         net_profit_ttm: row.get(12)?,
         net_assets: row.get(13)?,
         roe: row.get(14)?,
-        total_shares: row.get(15)?,
-        net_profit_q1: row.get(16)?,
-        net_profit_q2: row.get(17)?,
-        net_profit_q3: row.get(18)?,
-        net_profit_q4: row.get(19)?,
-        net_assets_parent: row.get(20)?,
-        note: row.get(21)?,
-        created_at: row.get(22)?,
-        updated_at: row.get(23)?,
+        pe_ttm: row.get(15)?,
+        pb: row.get(16)?,
+        total_shares: row.get(17)?,
+        net_profit_q1: row.get(18)?,
+        net_profit_q2: row.get(19)?,
+        net_profit_q3: row.get(20)?,
+        net_profit_q4: row.get(21)?,
+        net_assets_parent: row.get(22)?,
+        note: row.get(23)?,
+        created_at: row.get(24)?,
+        updated_at: row.get(25)?,
     })
 }
 
@@ -71,6 +76,7 @@ const SELECT_FIELDS: &str =
     "id, name, symbol, market, currency, current_price, previous_close,
      shares, cost_price, pe, dividend_per_10_shares,
      total_share, net_profit_ttm, net_assets, roe,
+     pe_ttm, pb,
      total_shares, net_profit_q1, net_profit_q2, net_profit_q3, net_profit_q4,
      net_assets_parent, note, created_at, updated_at";
 
@@ -146,6 +152,7 @@ pub fn create_stock(
         current_price, previous_close, shares, cost_price, pe,
         dividend_per_10_shares,
         total_share, net_profit_ttm, net_assets, roe,
+        pe_ttm: 0.0, pb: 0.0,
         total_shares, net_profit_q1, net_profit_q2, net_profit_q3, net_profit_q4,
         net_assets_parent, note,
         created_at: now.clone(), updated_at: now,
@@ -217,6 +224,8 @@ pub fn update_stock(
         current_price, previous_close, shares, cost_price, pe,
         dividend_per_10_shares,
         total_share, net_profit_ttm, net_assets, roe,
+        pe_ttm: stock["pe_ttm"].as_f64().unwrap_or(0.0),
+        pb: stock["pb"].as_f64().unwrap_or(0.0),
         total_shares, net_profit_q1, net_profit_q2, net_profit_q3, net_profit_q4,
         net_assets_parent, note,
         created_at, updated_at: now,
@@ -234,12 +243,9 @@ pub fn delete_stock(state: tauri::State<AppState>, id: String) -> Result<(), Str
 
 #[derive(Debug, Deserialize)]
 struct StockMetrics {
-    #[serde(rename = "ROE")]
+    pe_ttm: f64,
+    pb: f64,
     roe: f64,
-    net_profit_ttm: f64,
-    net_assets: f64,
-    #[serde(rename = "totalShare")]
-    total_share: f64,
 }
 
 #[derive(Debug, Serialize)]
@@ -268,7 +274,9 @@ fn to_baostock_code(symbol: &str) -> Result<String, String> {
     if s.len() != 6 || !s.chars().all(|c| c.is_ascii_digit()) {
         return Err(format!("股票代码无效: {}", symbol));
     }
-    if s.starts_with('6') || s.starts_with('9') {
+    // 上交所: 6/9 开头的股票，以及 51/52/53/55/56/58 开头的 ETF
+    let sh_prefixes = ["6", "9", "51", "52", "53", "55", "56", "58"];
+    if sh_prefixes.iter().any(|p| s.starts_with(p)) {
         Ok(format!("sh.{}", s))
     } else {
         Ok(format!("sz.{}", s))
@@ -306,9 +314,13 @@ fn run_python_stock_function(
     );
 
     let python_candidates = [
+        "/opt/homebrew/bin/python3",
         "/opt/homebrew/bin/python",
+        "/usr/local/bin/python3",
         "/usr/local/bin/python",
+        "python3",
         "python",
+        "/usr/bin/python3",
         "/usr/bin/python",
     ];
     let mut output_result = None;
@@ -398,15 +410,14 @@ pub fn refresh_fundamentals(
                 let now = Utc::now().to_rfc3339();
                 conn.execute(
                     "UPDATE stocks
-                     SET roe=?2, net_profit_ttm=?3, net_assets=?4, total_share=?5,
-                         updated_at=?6
+                     SET pe_ttm=?2, pb=?3, roe=?4,
+                         updated_at=?5
                      WHERE id=?1",
                     params![
                         id,
+                        metrics.pe_ttm,
+                        metrics.pb,
                         metrics.roe,
-                        metrics.net_profit_ttm,
-                        metrics.net_assets,
-                        metrics.total_share,
                         now
                     ],
                 )
@@ -1009,4 +1020,445 @@ pub fn delete_stock_note(state: tauri::State<AppState>, id: String) -> Result<()
     conn.execute("DELETE FROM stock_notes WHERE id = ?1", params![id])
         .map_err(|e| e.to_string())?;
     Ok(())
+}
+
+// ===== Research Reports =====
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ResearchReport {
+    pub id: String,
+    pub title: String,
+    pub summary: String,
+    pub content: String,
+    pub stock_symbols: String,
+    pub tags: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ResearchReportFormData {
+    pub title: String,
+    pub summary: String,
+    pub content: String,
+    pub stock_symbols: String,
+    pub tags: String,
+}
+
+#[tauri::command]
+pub fn list_research_reports(state: tauri::State<AppState>) -> Result<Vec<ResearchReport>, String> {
+    let db_path = state.db_path.lock().unwrap().clone();
+    let conn = rusqlite::Connection::open(&db_path).map_err(|e| e.to_string())?;
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, title, summary, content, stock_symbols, tags, created_at, updated_at
+             FROM research_reports ORDER BY updated_at DESC",
+        )
+        .map_err(|e| e.to_string())?;
+    let rows = stmt
+        .query_map([], |row| {
+            Ok(ResearchReport {
+                id: row.get(0)?,
+                title: row.get(1)?,
+                summary: row.get(2)?,
+                content: row.get(3)?,
+                stock_symbols: row.get(4)?,
+                tags: row.get(5)?,
+                created_at: row.get(6)?,
+                updated_at: row.get(7)?,
+            })
+        })
+        .map_err(|e| e.to_string())?;
+    rows.map(|r| r.map_err(|e| e.to_string())).collect()
+}
+
+#[tauri::command]
+pub fn create_research_report(
+    state: tauri::State<AppState>,
+    data: ResearchReportFormData,
+) -> Result<ResearchReport, String> {
+    let db_path = state.db_path.lock().unwrap().clone();
+    let conn = rusqlite::Connection::open(&db_path).map_err(|e| e.to_string())?;
+    let id = Uuid::new_v4().to_string();
+    let now = Utc::now().to_rfc3339();
+    conn.execute(
+        "INSERT INTO research_reports (id, title, summary, content, stock_symbols, tags, created_at, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+        params![id, data.title, data.summary, data.content, data.stock_symbols, data.tags, now, now],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(ResearchReport {
+        id,
+        title: data.title,
+        summary: data.summary,
+        content: data.content,
+        stock_symbols: data.stock_symbols,
+        tags: data.tags,
+        created_at: now.clone(),
+        updated_at: now,
+    })
+}
+
+#[tauri::command]
+pub fn update_research_report(
+    state: tauri::State<AppState>,
+    id: String,
+    data: ResearchReportFormData,
+) -> Result<ResearchReport, String> {
+    let db_path = state.db_path.lock().unwrap().clone();
+    let conn = rusqlite::Connection::open(&db_path).map_err(|e| e.to_string())?;
+    let now = Utc::now().to_rfc3339();
+    let created_at: String = conn
+        .query_row(
+            "SELECT created_at FROM research_reports WHERE id = ?1",
+            params![id],
+            |row| row.get(0),
+        )
+        .map_err(|e| e.to_string())?;
+    conn.execute(
+        "UPDATE research_reports SET title=?2, summary=?3, content=?4, stock_symbols=?5, tags=?6, updated_at=?7 WHERE id=?1",
+        params![id, data.title, data.summary, data.content, data.stock_symbols, data.tags, now],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(ResearchReport {
+        id,
+        title: data.title,
+        summary: data.summary,
+        content: data.content,
+        stock_symbols: data.stock_symbols,
+        tags: data.tags,
+        created_at,
+        updated_at: now,
+    })
+}
+
+#[tauri::command]
+pub fn delete_research_report(state: tauri::State<AppState>, id: String) -> Result<(), String> {
+    let db_path = state.db_path.lock().unwrap().clone();
+    let conn = rusqlite::Connection::open(&db_path).map_err(|e| e.to_string())?;
+    conn.execute("DELETE FROM research_reports WHERE id = ?1", params![id])
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+// ----- Agent 对话持久化 -----
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct AgentConversation {
+    pub id: String,
+    pub title: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct AgentMessage {
+    pub id: String,
+    pub conversation_id: String,
+    pub role: String,
+    pub content: String,
+    pub created_at: String,
+}
+
+#[tauri::command]
+pub fn list_agent_conversations(state: tauri::State<AppState>) -> Result<Vec<AgentConversation>, String> {
+    let db_path = state.db_path.lock().unwrap().clone();
+    let conn = rusqlite::Connection::open(&db_path).map_err(|e| e.to_string())?;
+    let mut stmt = conn
+        .prepare("SELECT id, title, created_at, updated_at FROM agent_conversations ORDER BY updated_at DESC")
+        .map_err(|e| e.to_string())?;
+    let rows = stmt
+        .query_map([], |row| {
+            Ok(AgentConversation {
+                id: row.get(0)?,
+                title: row.get(1)?,
+                created_at: row.get(2)?,
+                updated_at: row.get(3)?,
+            })
+        })
+        .map_err(|e| e.to_string())?;
+    rows.map(|r| r.map_err(|e| e.to_string())).collect()
+}
+
+#[tauri::command]
+pub fn create_agent_conversation(state: tauri::State<AppState>, title: String) -> Result<AgentConversation, String> {
+    let db_path = state.db_path.lock().unwrap().clone();
+    let conn = rusqlite::Connection::open(&db_path).map_err(|e| e.to_string())?;
+    let id = Uuid::new_v4().to_string();
+    let now = Utc::now().to_rfc3339();
+    let title = if title.is_empty() { "新对话".to_string() } else { title };
+    conn.execute(
+        "INSERT INTO agent_conversations (id, title, created_at, updated_at) VALUES (?1, ?2, ?3, ?4)",
+        params![id, title, now, now],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(AgentConversation { id, title, created_at: now.clone(), updated_at: now })
+}
+
+#[tauri::command]
+pub fn update_agent_conversation_title(
+    state: tauri::State<AppState>,
+    id: String,
+    title: String,
+) -> Result<(), String> {
+    let db_path = state.db_path.lock().unwrap().clone();
+    let conn = rusqlite::Connection::open(&db_path).map_err(|e| e.to_string())?;
+    let now = Utc::now().to_rfc3339();
+    conn.execute(
+        "UPDATE agent_conversations SET title=?2, updated_at=?3 WHERE id=?1",
+        params![id, title, now],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn delete_agent_conversation(state: tauri::State<AppState>, id: String) -> Result<(), String> {
+    let db_path = state.db_path.lock().unwrap().clone();
+    let conn = rusqlite::Connection::open(&db_path).map_err(|e| e.to_string())?;
+    conn.execute("DELETE FROM agent_conversations WHERE id = ?1", params![id])
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn list_agent_messages(
+    state: tauri::State<AppState>,
+    conversation_id: String,
+) -> Result<Vec<AgentMessage>, String> {
+    let db_path = state.db_path.lock().unwrap().clone();
+    let conn = rusqlite::Connection::open(&db_path).map_err(|e| e.to_string())?;
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, conversation_id, role, content, created_at
+             FROM agent_messages WHERE conversation_id = ?1 ORDER BY created_at ASC",
+        )
+        .map_err(|e| e.to_string())?;
+    let rows = stmt
+        .query_map(params![conversation_id], |row| {
+            Ok(AgentMessage {
+                id: row.get(0)?,
+                conversation_id: row.get(1)?,
+                role: row.get(2)?,
+                content: row.get(3)?,
+                created_at: row.get(4)?,
+            })
+        })
+        .map_err(|e| e.to_string())?;
+    rows.map(|r| r.map_err(|e| e.to_string())).collect()
+}
+
+#[tauri::command]
+pub fn append_agent_message(
+    state: tauri::State<AppState>,
+    conversation_id: String,
+    role: String,
+    content: String,
+) -> Result<AgentMessage, String> {
+    let db_path = state.db_path.lock().unwrap().clone();
+    let conn = rusqlite::Connection::open(&db_path).map_err(|e| e.to_string())?;
+    let id = Uuid::new_v4().to_string();
+    let now = Utc::now().to_rfc3339();
+    conn.execute(
+        "INSERT INTO agent_messages (id, conversation_id, role, content, created_at) VALUES (?1, ?2, ?3, ?4, ?5)",
+        params![id, conversation_id, role, content, now],
+    )
+    .map_err(|e| e.to_string())?;
+    conn.execute(
+        "UPDATE agent_conversations SET updated_at=?2 WHERE id=?1",
+        params![conversation_id, now],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(AgentMessage { id, conversation_id, role, content, created_at: now })
+}
+
+// ----- LLM 代理请求 (绕过 WebView 网络限制) -----
+
+#[derive(Debug, Deserialize)]
+pub struct ChatCompletionRequest {
+    pub endpoint: String,
+    pub api_key: String,
+    pub model: String,
+    pub messages: Vec<serde_json::Value>,
+}
+
+#[tauri::command]
+pub async fn chat_completion(req: ChatCompletionRequest) -> Result<String, String> {
+    let client = reqwest::Client::builder()
+        .danger_accept_invalid_certs(false)
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    let body = serde_json::json!({
+        "model": req.model,
+        "messages": req.messages,
+        "stream": false,
+    });
+
+    let resp = client
+        .post(&req.endpoint)
+        .header("Content-Type", "application/json")
+        .header("Authorization", format!("Bearer {}", req.api_key))
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| format!("请求失败: {}", e))?;
+
+    let status = resp.status();
+    let text = resp.text().await.map_err(|e| e.to_string())?;
+
+    if !status.is_success() {
+        let preview = if text.is_empty() { "(空响应)".to_string() } else { text[..text.len().min(400)].to_string() };
+        return Err(format!("HTTP {} — URL: {} — 响应: {}", status.as_u16(), req.endpoint, preview));
+    }
+
+    let json: serde_json::Value = serde_json::from_str(&text).map_err(|e| e.to_string())?;
+    let content = json["choices"][0]["message"]["content"]
+        .as_str()
+        .unwrap_or("(无内容)")
+        .to_string();
+    Ok(content)
+}
+
+// ----- K 线数据 -----
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct KlineBar {
+    pub date: String,
+    pub open: f64,
+    pub high: f64,
+    pub low: f64,
+    pub close: f64,
+    pub volume: f64,
+}
+
+fn run_python_simple(script_path: &Path, args: &[&str]) -> Result<String, String> {
+    let python_candidates = [
+        "/opt/homebrew/bin/python3",
+        "/opt/homebrew/bin/python",
+        "/usr/local/bin/python3",
+        "/usr/local/bin/python",
+        "python3",
+        "python",
+        "/usr/bin/python3",
+        "/usr/bin/python",
+    ];
+    let mut last_error = String::new();
+    for python in python_candidates {
+        match Command::new(python).arg(script_path).args(args).output() {
+            Ok(output) => {
+                if !output.status.success() {
+                    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+                    return Err(if stderr.is_empty() {
+                        "Python 脚本执行失败".to_string()
+                    } else {
+                        stderr
+                    });
+                }
+                return Ok(String::from_utf8_lossy(&output.stdout).to_string());
+            }
+            Err(e) => {
+                last_error = format!("{}: {}", python, e);
+            }
+        }
+    }
+    Err(format!("无法运行 python: {}", last_error))
+}
+
+#[tauri::command]
+pub fn refresh_kline(
+    app: tauri::AppHandle,
+    state: tauri::State<AppState>,
+    stock_id: String,
+    period: Option<String>,
+    days: Option<u32>,
+) -> Result<usize, String> {
+    let db_path = state.db_path.lock().unwrap().clone();
+    let conn = rusqlite::Connection::open(&db_path).map_err(|e| e.to_string())?;
+
+    let (symbol, market): (String, String) = conn
+        .query_row(
+            "SELECT symbol, market FROM stocks WHERE id=?1",
+            params![stock_id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .map_err(|e| e.to_string())?;
+
+    if market != "A股" {
+        return Err(format!("K 线暂只支持 A 股，当前市场: {}", market));
+    }
+
+    let period_str = period.as_deref().unwrap_or("d");
+    // map frontend period codes to baostock frequency codes
+    let freq = match period_str {
+        "w" => "w",
+        "y" => "m", // 年线用月线
+        _ => "d",
+    };
+    let default_days: u32 = match period_str {
+        "w" => 520,
+        "y" => 120, // 10 years of monthly bars
+        _ => 2500,
+    };
+    let days_val = days.unwrap_or(default_days);
+    let days_str = days_val.to_string();
+
+    let bs_code = to_baostock_code(&symbol)?;
+    let script_path = bundled_script_path(&app, KLINE_SCRIPT);
+    let stdout = run_python_simple(&script_path, &[&bs_code, &days_str, freq])?;
+
+    let json_line = stdout
+        .lines()
+        .map(str::trim)
+        .find(|l| l.starts_with('['))
+        .unwrap_or(stdout.trim());
+
+    let bars: Vec<KlineBar> = serde_json::from_str(json_line)
+        .map_err(|e| format!("解析 K 线 JSON 失败: {}", e))?;
+
+    let mut count = 0usize;
+    for bar in &bars {
+        if bar.date.is_empty() { continue; }
+        let id = Uuid::new_v4().to_string();
+        conn.execute(
+            "INSERT INTO kline_data (id, stock_id, date, period, open, high, low, close, volume)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+             ON CONFLICT(stock_id, period, date) DO UPDATE SET
+               open=excluded.open, high=excluded.high, low=excluded.low,
+               close=excluded.close, volume=excluded.volume",
+            params![id, stock_id, bar.date, period_str, bar.open, bar.high, bar.low, bar.close, bar.volume],
+        ).map_err(|e| e.to_string())?;
+        count += 1;
+    }
+    Ok(count)
+}
+
+#[tauri::command]
+pub fn get_kline_data(
+    state: tauri::State<AppState>,
+    stock_id: String,
+    period: Option<String>,
+) -> Result<Vec<KlineBar>, String> {
+    let db_path = state.db_path.lock().unwrap().clone();
+    let conn = rusqlite::Connection::open(&db_path).map_err(|e| e.to_string())?;
+    let period_str = period.as_deref().unwrap_or("d");
+    let mut stmt = conn
+        .prepare(
+            "SELECT date, open, high, low, close, volume
+             FROM kline_data WHERE stock_id=?1 AND period=?2 ORDER BY date ASC",
+        )
+        .map_err(|e| e.to_string())?;
+    let rows = stmt
+        .query_map(params![stock_id, period_str], |row| {
+            Ok(KlineBar {
+                date: row.get(0)?,
+                open: row.get(1)?,
+                high: row.get(2)?,
+                low: row.get(3)?,
+                close: row.get(4)?,
+                volume: row.get(5)?,
+            })
+        })
+        .map_err(|e| e.to_string())?;
+    rows.collect::<Result<Vec<_>, _>>().map_err(|e| e.to_string())
 }

@@ -515,6 +515,7 @@ export default function StockTradeDialog({
             <button
               type="button"
               className="btn btn-outline"
+              style={{ minWidth: 72 }}
               onClick={onClose}
               disabled={saving}
             >
@@ -523,9 +524,10 @@ export default function StockTradeDialog({
             <button
               type="submit"
               className="btn btn-primary"
+              style={{ minWidth: 88 }}
               disabled={saving || !formValid}
             >
-              {saving ? "处理中…" : "确认"}
+              {saving ? "处理中…" : "确认操作"}
             </button>
           </div>
         </form>
